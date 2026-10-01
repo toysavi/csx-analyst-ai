@@ -1,6 +1,6 @@
 import React from 'react';
 import { CSXIndexData } from '../types/csx';
-import { TrendingUp, TrendingDown, Clock, ShieldCheck, Activity } from 'lucide-react';
+import { TrendingUp, TrendingDown, Clock, ShieldCheck, Database, Radio } from 'lucide-react';
 
 interface TickerBarProps {
   indexData: CSXIndexData;
@@ -9,6 +9,8 @@ interface TickerBarProps {
   language: 'EN' | 'KH';
   onLanguageToggle: () => void;
   onOpenLiveSync?: () => void;
+  dbStatus?: { connected: boolean; mode: string; database: string } | null;
+  isLiveConnected?: boolean;
 }
 
 export const TickerBar: React.FC<TickerBarProps> = ({
@@ -18,6 +20,8 @@ export const TickerBar: React.FC<TickerBarProps> = ({
   language,
   onLanguageToggle,
   onOpenLiveSync,
+  dbStatus,
+  isLiveConnected,
 }) => {
   const isPositive = indexData.change >= 0;
 
@@ -57,6 +61,25 @@ export const TickerBar: React.FC<TickerBarProps> = ({
           <span className="text-emerald-400 font-semibold">{indexData.tradingSession || 'Continuous Trading (09:00 - 14:50)'}</span>
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse ml-1" title="Official CSX Market Feed Connected"></span>
         </button>
+
+        {/* MongoDB / Storage Badge */}
+        <button
+          onClick={onOpenLiveSync}
+          className="hidden sm:flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded border font-mono transition cursor-pointer bg-slate-800/80 hover:bg-slate-750 border-slate-700/50 text-slate-300"
+          title="Database Persistence Status (MongoDB / Fallback)"
+        >
+          <Database className={`w-3 h-3 ${dbStatus?.connected ? 'text-emerald-400' : 'text-amber-400'}`} />
+          <span>{dbStatus?.connected ? `MongoDB: ${dbStatus.database}` : (dbStatus ? 'Memory Store' : 'Connecting DB...')}</span>
+          <span className={`w-1.5 h-1.5 rounded-full ${dbStatus?.connected ? 'bg-emerald-400' : 'bg-amber-400'} animate-pulse`} />
+        </button>
+
+        {/* Live SSE Stream Badge */}
+        {isLiveConnected && (
+          <div className="hidden xl:flex items-center gap-1 text-[10px] text-emerald-400 bg-emerald-950/60 border border-emerald-800/50 px-2 py-0.5 rounded font-mono">
+            <Radio className="w-2.5 h-2.5 animate-pulse text-emerald-400" />
+            <span>SSE LIVE</span>
+          </div>
+        )}
       </div>
 
       {/* Actual Data vs AI tag + Currency Switcher */}

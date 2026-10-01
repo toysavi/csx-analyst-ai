@@ -25,15 +25,18 @@ docker run -d \
 
 Open your browser at: **`http://localhost:3000`**
 
-### Option B: Using Docker Compose
+### Option B: Using Docker Compose (App + MongoDB Persistence)
 Create a `.env` file containing:
 ```bash
 GEMINI_API_KEY=YOUR_GEMINI_API_KEY
 ```
-Then start the application with:
+Then start the application and MongoDB with:
 ```bash
 docker compose up -d
 ```
+This automatically boots:
+- **MongoDB 7.0**: with persistent storage volume (`mongodb_data`)
+- **CSX AI Analyst**: connected to MongoDB via `mongodb://mongodb:27017/csx_analyst`
 
 To view logs:
 ```bash
@@ -44,6 +47,39 @@ To stop:
 ```bash
 docker compose down
 ```
+
+---
+
+## 🍃 MongoDB Database & Real-Time Sync Architecture
+
+### Do you require your own DB?
+**Yes, for production and real CSX synchronization, a database is strongly required:**
+1. **Persistence Across Deployments & Restarts:** Without a DB, all synchronized market prices, custom batch pastes, and daily pipeline simulations revert to mock defaults whenever the container restarts (e.g. ArgoCD deployments).
+2. **Historical Time-Series OHLCV Storage:** Essential for calculating daily technical indicators (SMA, RSI, MACD, Bollinger Bands) and measuring 7-day AI forecast accuracy over time.
+3. **Resilient Dual-Mode Operation:** If MongoDB is connected, the app persists all changes and automatically seeds initial CSX data. If MongoDB is offline, the app gracefully falls back to memory mode without crashing.
+
+### Collections Structure
+| Collection | Description | Indexed Fields |
+|---|---|---|
+| `stocks` | Full securities records with pricing, ratios, order books, and 7-day forecasts | `ticker: 1` (unique) |
+| `historical_prices` | Daily OHLCV time-series records for charting and backtesting | `ticker: 1, date: -1` |
+| `news` | CSX financial news, macroeconomic headlines, and AI sentiment scores | `id: 1, date: -1` |
+| `disclosures` | Verified corporate disclosures and SERC filings | `id: 1, date: -1` |
+| `sync_logs` | Audit trail of every live tick, batch paste, and daily pipeline run | `timestamp: -1` |
+
+### Easy-to-Query REST Endpoints
+The backend provides instant filtering and sorting out of the box:
+* `GET /api/csx/stocks?board=Main%20Board`: Filter securities on the Main Board
+* `GET /api/csx/stocks?minScore=70`: Filter by minimum AI Score
+* `GET /api/csx/stocks?sortBy=currentPrice&order=desc`: Sort securities by trading price
+* `GET /api/csx/stocks/PAS/history?timeframe=1M`: Query 1-month historical daily candles
+* `GET /api/csx/sync/history`: Retrieve recent sync audit records
+* `GET /api/csx/db-status`: Inspect live database connection state and document counts
+
+### Dynamic Real-Time UI Synchronization (SSE)
+* **Server-Sent Events (`/api/csx/events`):** Every time CSX market data syncs (via manual quote edit, batch paste, scheduled auction tick, or daily pipeline run), the server instantly broadcasts a `market-sync` event to all connected React clients.
+* **Reactive Frontend:** The UI dynamically updates quotes, charts, and forecasts in real time without requiring a page refresh, displaying an animated sync toast notification.
+
 
 ---
 

@@ -32,6 +32,12 @@ spec:
                 secretKeyRef:
                   name: csx-analyst-secrets
                   key: GEMINI_API_KEY
+            - name: MONGODB_URI
+              valueFrom:
+                secretKeyRef:
+                  name: csx-analyst-secrets
+                  key: MONGODB_URI
+                  optional: true
           livenessProbe:
             httpGet:
               path: /api/csx/market-overview

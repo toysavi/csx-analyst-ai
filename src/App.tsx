@@ -44,6 +44,23 @@ export default function App() {
   const [isAlertsOpen, setIsAlertsOpen] = useState(false);
   const [isLiveSyncOpen, setIsLiveSyncOpen] = useState(false);
 
+  // MongoDB Database & Real-Time Sync Status
+  const [dbStatus, setDbStatus] = useState<any>(null);
+  const [isLiveConnected, setIsLiveConnected] = useState(false);
+  const [syncToast, setSyncToast] = useState<{ message: string; timestamp: string; type?: string } | null>(null);
+
+  const fetchDbStatus = async () => {
+    try {
+      const res = await fetch('/api/csx/db-status');
+      if (res.ok) {
+        const data = await res.json();
+        setDbStatus(data);
+      }
+    } catch (e) {
+      console.warn('Could not fetch DB status:', e);
+    }
+  };
+
   // Initial data loading from server API
   useEffect(() => {
     async function loadData() {
@@ -81,7 +98,73 @@ export default function App() {
       }
     }
     loadData();
+    fetchDbStatus();
   }, []);
+
+  // Real-Time Dynamic Sync Stream (SSE) from CSX Feed & MongoDB
+  useEffect(() => {
+    let eventSource: EventSource | null = null;
+    let retryTimeout: any = null;
+
+    function connectSSE() {
+      try {
+        eventSource = new EventSource('/api/csx/events');
+
+        eventSource.onopen = () => {
+          setIsLiveConnected(true);
+        };
+
+        eventSource.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data.type === 'market-sync' || data.type === 'stock-update' || data.type === 'pipeline-completed') {
+              if (data.stocks && Array.isArray(data.stocks) && data.stocks.length > 0) {
+                setStocks(data.stocks);
+              }
+              if (data.indexData && data.indexData.index) {
+                setIndexData(data.indexData);
+              }
+
+              // Trigger dynamic real-time sync notification
+              setSyncToast({
+                message: data.message || `CSX Market Data Synced (${data.updatedCount || 1} securities updated)`,
+                timestamp: new Date().toLocaleTimeString(),
+                type: data.type,
+              });
+
+              // Refresh database document metrics
+              fetchDbStatus();
+            }
+          } catch (e) {
+            console.error('Error handling SSE sync event:', e);
+          }
+        };
+
+        eventSource.onerror = () => {
+          setIsLiveConnected(false);
+          eventSource?.close();
+          retryTimeout = setTimeout(connectSSE, 5000);
+        };
+      } catch (e) {
+        setIsLiveConnected(false);
+        retryTimeout = setTimeout(connectSSE, 5000);
+      }
+    }
+
+    connectSSE();
+
+    return () => {
+      eventSource?.close();
+      if (retryTimeout) clearTimeout(retryTimeout);
+    };
+  }, []);
+
+  // Auto-dismiss sync toast after 4.5s
+  useEffect(() => {
+    if (!syncToast) return;
+    const timer = setTimeout(() => setSyncToast(null), 4500);
+    return () => clearTimeout(timer);
+  }, [syncToast]);
 
   const handleSelectStock = (ticker: string) => {
     setSelectedTicker(ticker);
@@ -116,6 +199,8 @@ export default function App() {
         language={language}
         onLanguageToggle={() => setLanguage(prev => (prev === 'EN' ? 'KH' : 'EN'))}
         onOpenLiveSync={() => setIsLiveSyncOpen(true)}
+        dbStatus={dbStatus}
+        isLiveConnected={isLiveConnected}
       />
 
       {/* Main App Navbar */}
@@ -259,11 +344,36 @@ export default function App() {
         onClose={() => setIsLiveSyncOpen(false)}
         stocks={stocks}
         indexData={indexData}
+        dbStatus={dbStatus}
         onSyncComplete={(updatedStocks, newIndexData) => {
           setStocks(updatedStocks);
           setIndexData(newIndexData);
+          fetchDbStatus();
         }}
       />
+
+      {/* Dynamic Floating Real-Time Sync Toast */}
+      {syncToast && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 bg-slate-900/95 border border-emerald-500/60 shadow-[0_10px_30px_rgba(16,185,129,0.2)] backdrop-blur-md px-4 py-3 rounded-2xl text-xs font-mono text-emerald-300 animate-in fade-in slide-in-from-bottom-3 duration-300">
+          <div className="relative flex items-center justify-center">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
+            <span className="absolute w-4 h-4 rounded-full bg-emerald-400/40 animate-ping" />
+          </div>
+          <div>
+            <div className="font-bold flex items-center gap-1.5 text-white">
+              <span>⚡ CSX Data Synced</span>
+              <span className="text-[10px] text-emerald-400 font-normal">[{syncToast.timestamp}]</span>
+            </div>
+            <div className="text-[11px] text-slate-300 max-w-sm truncate">{syncToast.message}</div>
+          </div>
+          <button
+            onClick={() => setSyncToast(null)}
+            className="ml-2 text-slate-400 hover:text-white cursor-pointer px-1"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* AI Analyst Chat Modal */}
       <AIChatModal
@@ -292,6 +402,7 @@ export default function App() {
             },
             ...prev,
           ]);
+          fetchDbStatus();
         }}
       />
 

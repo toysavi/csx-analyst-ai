@@ -29,6 +29,60 @@ const ai = new GoogleGenAI({
   },
 });
 
+// Real-Time Server-Sent Events (SSE) Client Pool
+const sseClients = new Set<Response>();
+
+function broadcastMarketSync(data: any) {
+  const payload = `data: ${JSON.stringify(data)}\n\n`;
+  for (const client of sseClients) {
+    try {
+      client.write(payload);
+    } catch {
+      sseClients.delete(client);
+    }
+  }
+}
+
+// 0. SSE Live Sync Stream for React UI
+app.get('/api/csx/events', (req: Request, res: Response) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders?.();
+
+  sseClients.add(res);
+
+  // Send initial connected payload
+  res.write(`data: ${JSON.stringify({ type: 'connected', timestamp: new Date().toISOString(), clientsCount: sseClients.size })}\n\n`);
+
+  req.on('close', () => {
+    sseClients.delete(res);
+  });
+});
+
+// 0.1 MongoDB & Storage Status
+app.get('/api/csx/db-status', async (_req: Request, res: Response) => {
+  try {
+    const status = await csxDataProvider.getDbStatus();
+    res.json(status);
+  } catch (error) {
+    console.error('Error fetching DB status:', error);
+    res.status(500).json({ error: 'Failed to fetch DB status' });
+  }
+});
+
+// 0.2 Sync Audit Log History
+app.get('/api/csx/sync/history', async (req: Request, res: Response) => {
+  try {
+    const limit = Number(req.query.limit) || 15;
+    const history = await csxDataProvider.getSyncHistory(limit);
+    res.json(history);
+  } catch (error) {
+    console.error('Error fetching sync history:', error);
+    res.status(500).json({ error: 'Failed to fetch sync history' });
+  }
+});
+
 // 1. CSX Market Overview
 app.get('/api/csx/market-overview', async (_req: Request, res: Response) => {
   try {
@@ -40,10 +94,19 @@ app.get('/api/csx/market-overview', async (_req: Request, res: Response) => {
   }
 });
 
-// 2. All CSX Stocks
-app.get('/api/csx/stocks', async (_req: Request, res: Response) => {
+// 2. All CSX Stocks (Easily Queryable with MongoDB filters & sorting)
+app.get('/api/csx/stocks', async (req: Request, res: Response) => {
   try {
-    const stocks = await csxDataProvider.getAllStocks();
+    const { board, sector, minScore, search, sortBy, order, limit } = req.query;
+    const stocks = await csxDataProvider.getAllStocks({
+      board: board ? String(board) : undefined,
+      sector: sector ? String(sector) : undefined,
+      minScore: minScore ? Number(minScore) : undefined,
+      search: search ? String(search) : undefined,
+      sortBy: sortBy as any,
+      order: order as any,
+      limit: limit ? Number(limit) : undefined,
+    });
     res.json(stocks);
   } catch (error) {
     console.error('Error fetching stocks:', error);
@@ -122,7 +185,7 @@ app.get('/api/csx/provider-status', async (_req: Request, res: Response) => {
   }
 });
 
-// 6.2 Live Market Sync & Ingestion (supports customUpdates, JSON array, or raw text)
+// 6.2 Live Market Sync & Ingestion (broadcasts to UI dynamically)
 app.post('/api/csx/sync-live', async (req: Request, res: Response) => {
   try {
     let customUpdates = req.body?.customUpdates;
@@ -156,6 +219,17 @@ app.post('/api/csx/sync-live', async (req: Request, res: Response) => {
     }
 
     const result = await csxDataProvider.syncLiveMarket(customUpdates);
+
+    // Broadcast live update to all connected React clients via SSE
+    broadcastMarketSync({
+      type: 'market-sync',
+      message: `Synchronized ${result.updatedCount} CSX securities`,
+      updatedCount: result.updatedCount,
+      stocks: result.stocks,
+      indexData: result.indexData,
+      timestamp: new Date().toISOString(),
+    });
+
     res.json({
       success: true,
       message: `Successfully synchronized ${result.updatedCount} CSX securities`,
@@ -167,7 +241,7 @@ app.post('/api/csx/sync-live', async (req: Request, res: Response) => {
   }
 });
 
-// 6.3 Update Single Stock Price (Live Real-Time Override)
+// 6.3 Update Single Stock Price (Live Real-Time Override & Broadcast)
 app.post('/api/csx/update-stock', async (req: Request, res: Response) => {
   try {
     const { ticker, price, change, volume } = req.body;
@@ -176,6 +250,19 @@ app.post('/api/csx/update-stock', async (req: Request, res: Response) => {
     }
     const updatedStock = await csxDataProvider.updateStockPrice(ticker, Number(price), change, volume);
     const indexData = await csxDataProvider.getMarketOverview();
+    const allStocks = await csxDataProvider.getAllStocks();
+
+    // Broadcast update to all connected React clients via SSE
+    broadcastMarketSync({
+      type: 'stock-update',
+      message: `${ticker} updated to ${Number(price).toLocaleString()} KHR`,
+      ticker,
+      stock: updatedStock,
+      stocks: allStocks,
+      indexData,
+      timestamp: new Date().toISOString(),
+    });
+
     res.json({
       success: true,
       stock: updatedStock,
@@ -216,6 +303,18 @@ app.post('/api/csx/run-daily-pipeline', async (_req: Request, res: Response) => 
       { stepNumber: 11, name: 'Compare previous forecasts with actual outcomes', status: 'completed', details: 'Evaluated 7-day-old forecasts against actual closing prices.', durationMs: 110 },
       { stepNumber: 12, name: 'Update forecast accuracy metrics (MAE, MAPE, Directional)', status: 'completed', details: 'Updated accuracy grades and mean absolute percentage errors.', durationMs: 85 },
     ];
+
+    const currentStocks = await csxDataProvider.getAllStocks();
+    const currentIndex = await csxDataProvider.getMarketOverview();
+
+    // Broadcast pipeline update to UI
+    broadcastMarketSync({
+      type: 'pipeline-completed',
+      message: 'Daily Analysis Pipeline completed successfully',
+      stocks: currentStocks,
+      indexData: currentIndex,
+      timestamp: new Date().toISOString(),
+    });
 
     res.json({
       success: true,

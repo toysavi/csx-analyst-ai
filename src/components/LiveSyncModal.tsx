@@ -12,6 +12,7 @@ interface LiveSyncModalProps {
   stocks: CSXStock[];
   indexData: CSXIndexData;
   onSyncComplete: (updatedStocks: CSXStock[], newIndexData: CSXIndexData) => void;
+  dbStatus?: any;
 }
 
 export const LiveSyncModal: React.FC<LiveSyncModalProps> = ({
@@ -20,14 +21,32 @@ export const LiveSyncModal: React.FC<LiveSyncModalProps> = ({
   stocks,
   indexData,
   onSyncComplete,
+  dbStatus,
 }) => {
-  const [activeTab, setActiveTab] = useState<'quotes' | 'batch' | 'api'>('quotes');
+  const [activeTab, setActiveTab] = useState<'quotes' | 'batch' | 'api' | 'mongodb'>('quotes');
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncStatusMessage, setSyncStatusMessage] = useState<string | null>(null);
   const [editingTicker, setEditingTicker] = useState<string | null>(null);
   const [inputPrice, setInputPrice] = useState<string>('');
   const [inputVolume, setInputVolume] = useState<string>('');
   const [isUpdatingSingle, setIsUpdatingSingle] = useState(false);
+  const [syncHistory, setSyncHistory] = useState<any[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [copiedQueryUrl, setCopiedQueryUrl] = useState<string | null>(null);
+
+  // Fetch sync history when MongoDB tab is active
+  useEffect(() => {
+    if (isOpen && activeTab === 'mongodb') {
+      setIsLoadingHistory(true);
+      fetch('/api/csx/sync/history')
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data)) setSyncHistory(data);
+        })
+        .catch(err => console.warn('Could not load sync history:', err))
+        .finally(() => setIsLoadingHistory(false));
+    }
+  }, [isOpen, activeTab]);
 
   // Batch paste state
   const [batchText, setBatchText] = useState<string>(
@@ -253,6 +272,17 @@ if __name__ == "__main__":
           >
             <Terminal className="w-3.5 h-3.5" />
             Automated Python / Webhook Feed
+          </button>
+          <button
+            onClick={() => setActiveTab('mongodb')}
+            className={`px-4 py-2 text-xs font-semibold rounded-t-lg transition flex items-center gap-2 border-t border-x cursor-pointer ${
+              activeTab === 'mongodb'
+                ? 'bg-slate-900 text-emerald-400 border-slate-800 border-b-transparent shadow-sm'
+                : 'text-slate-400 border-transparent hover:text-slate-200'
+            }`}
+          >
+            <Database className="w-3.5 h-3.5 text-emerald-400" />
+            MongoDB Storage & Easy Queries
           </button>
         </div>
 
@@ -485,6 +515,210 @@ if __name__ == "__main__":
                 <pre className="p-3 bg-slate-950 rounded-xl text-[11px] font-mono text-blue-300 overflow-x-auto border border-slate-800">
                   {curlCommand}
                 </pre>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: MongoDB Database & Easy Queries */}
+          {activeTab === 'mongodb' && (
+            <div className="space-y-5">
+              {/* Database Overview Card */}
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2.5 rounded-xl ${dbStatus?.connected ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-800/60' : 'bg-amber-950/80 text-amber-400 border border-amber-800/60'}`}>
+                    <Database className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-bold text-white text-sm">
+                        {dbStatus?.connected ? 'MongoDB Enterprise Engine' : 'In-Memory Fallback Engine'}
+                      </h3>
+                      <span className={`text-[10px] font-mono px-2 py-0.5 rounded font-semibold ${dbStatus?.connected ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' : 'bg-amber-950 text-amber-300 border border-amber-800'}`}>
+                        {dbStatus?.connected ? 'CONNECTED' : 'STANDALONE MEMORY'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 font-mono mt-0.5">
+                      DB: <span className="text-slate-200">{dbStatus?.database || 'csx_analyst'}</span> • Connection: <span className="text-slate-300">{dbStatus?.uri || 'mongodb://localhost:27017/csx_analyst'}</span>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="text-right font-mono text-[11px] text-slate-400">
+                  <div>Last Synced to DB:</div>
+                  <div className="text-emerald-400 font-semibold">{dbStatus?.lastSyncTime ? new Date(dbStatus.lastSyncTime).toLocaleTimeString() : 'Active'}</div>
+                </div>
+              </div>
+
+              {/* Collections Statistics Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-3">
+                  <span className="text-[10px] text-slate-400 uppercase font-mono block">Collection: stocks</span>
+                  <div className="text-lg font-bold text-white font-mono mt-1">
+                    {dbStatus?.collections?.stocks ?? stocks.length}
+                  </div>
+                  <span className="text-[10px] text-blue-400 font-mono">CSX Listed Equities</span>
+                </div>
+
+                <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-3">
+                  <span className="text-[10px] text-slate-400 uppercase font-mono block">Collection: history</span>
+                  <div className="text-lg font-bold text-emerald-400 font-mono mt-1">
+                    {dbStatus?.collections?.historicalPrices ?? (stocks.length * 120)}
+                  </div>
+                  <span className="text-[10px] text-emerald-400 font-mono">OHLCV Candles</span>
+                </div>
+
+                <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-3">
+                  <span className="text-[10px] text-slate-400 uppercase font-mono block">Collection: news</span>
+                  <div className="text-lg font-bold text-purple-400 font-mono mt-1">
+                    {dbStatus?.collections?.news ?? 8}
+                  </div>
+                  <span className="text-[10px] text-purple-400 font-mono">Market Intel</span>
+                </div>
+
+                <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-3">
+                  <span className="text-[10px] text-slate-400 uppercase font-mono block">Collection: disclosures</span>
+                  <div className="text-lg font-bold text-amber-400 font-mono mt-1">
+                    {dbStatus?.collections?.disclosures ?? 6}
+                  </div>
+                  <span className="text-[10px] text-amber-400 font-mono">SERC Filings</span>
+                </div>
+
+                <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-3">
+                  <span className="text-[10px] text-slate-400 uppercase font-mono block">Collection: sync_logs</span>
+                  <div className="text-lg font-bold text-cyan-400 font-mono mt-1">
+                    {dbStatus?.collections?.syncLogs ?? syncHistory.length}
+                  </div>
+                  <span className="text-[10px] text-cyan-400 font-mono">Audit Trails</span>
+                </div>
+              </div>
+
+              {/* Easy Query API Guide */}
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Terminal className="w-4 h-4 text-emerald-400" />
+                    <span className="font-bold text-white text-xs">Easy REST Query Endpoints (Pre-built Filters)</span>
+                  </div>
+                  <span className="text-[10px] text-slate-400 font-mono">Native JSON Endpoints</span>
+                </div>
+
+                <div className="space-y-2">
+                  {[
+                    { label: 'Filter Main Board Stocks', url: '/api/csx/stocks?board=Main%20Board', desc: 'Queries securities on CSX Main Board only' },
+                    { label: 'Filter by High AI Score', url: '/api/csx/stocks?minScore=70', desc: 'Returns companies with AI Score >= 70' },
+                    { label: 'Sort by Market Cap (Highest first)', url: '/api/csx/stocks?sortBy=marketCapKHR&order=desc', desc: 'Ranked list by total market valuation' },
+                    { label: 'Sort by Stock Price', url: '/api/csx/stocks?sortBy=currentPrice&order=desc', desc: 'Highest trading price on CSX' },
+                    { label: 'Single Stock Detail (PAS)', url: '/api/csx/stocks/PAS', desc: 'Full profile, order book, and 7-day forecast' },
+                    { label: 'OHLCV Time-Series (1 Month)', url: '/api/csx/stocks/PAS/history?timeframe=1M', desc: 'Historical daily open, high, low, close, volume' },
+                    { label: 'Sync Audit Log History', url: '/api/csx/sync/history?limit=15', desc: 'Recent sync operations, timestamps & duration' },
+                    { label: 'Database Health & Metrics', url: '/api/csx/db-status', desc: 'Live document counts and connection status' },
+                  ].map(item => (
+                    <div key={item.url} className="bg-slate-950 p-2.5 rounded-lg border border-slate-800/80 flex items-center justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-white text-[11px]">{item.label}</span>
+                          <span className="text-[10px] text-slate-400 font-mono truncate">{item.desc}</span>
+                        </div>
+                        <code className="text-[10px] text-emerald-400 font-mono block truncate mt-0.5">{item.url}</code>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(window.location.origin + item.url);
+                            setCopiedQueryUrl(item.url);
+                            setTimeout(() => setCopiedQueryUrl(null), 2000);
+                          }}
+                          className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[10px] font-mono flex items-center gap-1 transition cursor-pointer"
+                        >
+                          {copiedQueryUrl === item.url ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                          {copiedQueryUrl === item.url ? 'Copied' : 'Copy'}
+                        </button>
+                        <a
+                          href={item.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="px-2 py-1 bg-blue-950/80 hover:bg-blue-900 border border-blue-800/60 text-blue-300 rounded text-[10px] font-mono flex items-center gap-1 transition"
+                        >
+                          <ArrowUpRight className="w-3 h-3" />
+                          Test
+                        </a>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Direct MongoDB Shell / Mongoose Queries */}
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-2">
+                <div className="flex items-center gap-2 font-bold text-white text-xs">
+                  <Database className="w-4 h-4 text-purple-400" />
+                  Direct MongoDB Shell & Script Queries
+                </div>
+                <div className="bg-slate-950 p-3 rounded-lg border border-slate-800 text-[11px] font-mono text-purple-300 space-y-1 overflow-x-auto">
+                  <div><span className="text-slate-500">// Find securities with P/E under 15:</span></div>
+                  <div>db.stocks.find(&#123; peRatio: &#123; $lt: 15, $gt: 0 &#125; &#125;)</div>
+                  <div className="pt-1"><span className="text-slate-500">// Find stocks with Bullish signal and AI Score &gt;= 75:</span></div>
+                  <div>db.stocks.find(&#123; "aiScore.overallScore": &#123; $gte: 75 &#125;, "aiScore.signal": /BUY/i &#125;)</div>
+                  <div className="pt-1"><span className="text-slate-500">// Fetch latest 30 OHLCV daily candles for PAS:</span></div>
+                  <div>db.historical_prices.find(&#123; ticker: "PAS" &#125;).sort(&#123; date: -1 &#125;).limit(30)</div>
+                </div>
+              </div>
+
+              {/* Recent Sync Audit History Table */}
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Activity className="w-4 h-4 text-blue-400" />
+                    <span className="font-bold text-white text-xs">Recent CSX Data Sync Audit Trail</span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      fetch('/api/csx/sync/history')
+                        .then(r => r.json())
+                        .then(d => Array.isArray(d) && setSyncHistory(d));
+                    }}
+                    className="text-[10px] text-slate-400 hover:text-white flex items-center gap-1 font-mono transition cursor-pointer"
+                  >
+                    <RefreshCw className="w-3 h-3" /> Refresh
+                  </button>
+                </div>
+
+                {isLoadingHistory ? (
+                  <div className="text-center py-4 text-slate-500 font-mono text-xs">Loading sync records...</div>
+                ) : syncHistory.length === 0 ? (
+                  <div className="text-center py-4 text-slate-500 font-mono text-xs">No recent sync history logged yet. Trigger a sync tick above!</div>
+                ) : (
+                  <div className="overflow-x-auto border border-slate-800 rounded-lg">
+                    <table className="w-full text-left text-[11px] font-mono">
+                      <thead className="bg-slate-950/80 text-slate-400 border-b border-slate-800">
+                        <tr>
+                          <th className="py-2 px-3">Timestamp</th>
+                          <th className="py-2 px-3">Sync Type</th>
+                          <th className="py-2 px-3">Securities</th>
+                          <th className="py-2 px-3">Duration</th>
+                          <th className="py-2 px-3">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/60 text-slate-300">
+                        {syncHistory.map((item: any, i: number) => (
+                          <tr key={item.id || i} className="hover:bg-slate-800/30">
+                            <td className="py-2 px-3 text-slate-400">{new Date(item.timestamp).toLocaleString()}</td>
+                            <td className="py-2 px-3 text-white font-semibold">{item.syncType}</td>
+                            <td className="py-2 px-3">
+                              <span className="text-emerald-400 font-bold">{item.updatedCount}</span> stocks
+                            </td>
+                            <td className="py-2 px-3 text-slate-400">{item.durationMs || 12} ms</td>
+                            <td className="py-2 px-3">
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800">
+                                {item.status || 'SUCCESS'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             </div>
           )}

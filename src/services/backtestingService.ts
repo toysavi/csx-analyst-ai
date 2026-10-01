@@ -1,8 +1,8 @@
 import { BacktestParams, BacktestResult, BacktestTrade, StockForecastAccuracy } from '../types/csx';
-import { csxDataProvider } from './csxDataProvider';
+import { buildCSXStocks } from './csxMockData';
 
 export async function runBacktest(params: BacktestParams): Promise<BacktestResult> {
-  const stock = await csxDataProvider.getStock(params.ticker);
+  const stock = buildCSXStocks().find(s => s.ticker.toUpperCase() === params.ticker.toUpperCase());
   const currentPrice = stock?.currentPrice || 12500;
   const initialCapital = params.initialCapitalKHR || 10000000; // 10M KHR default (~$2,450)
 

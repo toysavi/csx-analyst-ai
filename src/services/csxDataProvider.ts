@@ -2,12 +2,14 @@ import { CSXIndexData, CSXStock, NewsItem, CSXDisclosure, MarketAlert, Historica
 import { CSX_INDEX_DATA, INITIAL_NEWS, INITIAL_DISCLOSURES, INITIAL_ALERTS, buildCSXStocks } from './csxMockData';
 import { computeTechnicalIndicators } from './technicalAnalysis';
 import { generate7DayForecast } from './forecastingEngine';
+import { mongoDBService, StockQueryOptions, SyncLogEntry } from './mongodb';
 
 export interface ICSXDataProvider {
   readonly isDemoProvider: boolean;
   readonly providerName: string;
+  init(): Promise<void>;
   getMarketOverview(): Promise<CSXIndexData>;
-  getAllStocks(): Promise<CSXStock[]>;
+  getAllStocks(options?: StockQueryOptions): Promise<CSXStock[]>;
   getStock(ticker: string): Promise<CSXStock | null>;
   getHistoricalPrices(ticker: string, timeframe?: string): Promise<HistoricalPricePoint[]>;
   getNews(ticker?: string): Promise<NewsItem[]>;
@@ -15,12 +17,14 @@ export interface ICSXDataProvider {
   getAlerts(): Promise<MarketAlert[]>;
   updateStockPrice(ticker: string, newPrice: number, change?: number, volume?: number): Promise<CSXStock>;
   syncLiveMarket(customUpdates?: Array<{ ticker: string; price: number; change?: number; volume?: number }>): Promise<{ updatedCount: number; stocks: CSXStock[]; indexData: CSXIndexData }>;
+  getSyncHistory(limit?: number): Promise<SyncLogEntry[]>;
+  getDbStatus(): Promise<any>;
   getProviderStatus(): { isConnected: boolean; source: string; tradingHours: string; lastSyncTime: string; isLiveFeedSupported: boolean; mode: string };
 }
 
 class CSXOfficialDataProvider implements ICSXDataProvider {
   readonly isDemoProvider = false;
-  readonly providerName = 'CSX Official Market Feed (Cambodia Securities Exchange - csx.com.kh)';
+  readonly providerName = 'CSX Official Market Feed & MongoDB Persistence (csx.com.kh)';
 
   private stocks: CSXStock[] = [];
   private news: NewsItem[] = [...INITIAL_NEWS];
@@ -28,33 +32,68 @@ class CSXOfficialDataProvider implements ICSXDataProvider {
   private alerts: MarketAlert[] = [...INITIAL_ALERTS];
   private indexData: CSXIndexData = { ...CSX_INDEX_DATA };
   private lastSyncTime: string = new Date().toISOString();
+  private isInitialized = false;
 
   constructor() {
     this.stocks = buildCSXStocks();
+    // Non-blocking initialization
+    this.init().catch(err => console.error('[CSXDataProvider] Init error:', err));
+  }
+
+  public async init(): Promise<void> {
+    if (this.isInitialized) return;
+    this.isInitialized = true;
+    try {
+      await mongoDBService.init();
+      // Load current stocks from DB if available
+      const dbStocks = await mongoDBService.queryStocks();
+      if (dbStocks && dbStocks.length > 0) {
+        this.stocks = dbStocks;
+      }
+      this.indexData = await mongoDBService.getMarketOverview();
+    } catch (e) {
+      console.warn('[CSXDataProvider] MongoDB init notice:', e);
+    }
   }
 
   getProviderStatus() {
     return {
       isConnected: true,
-      source: 'CSX Official Market Terminal (csx.com.kh & SERC)',
+      source: 'CSX Official Market Terminal (csx.com.kh & MongoDB)',
       tradingHours: '08:00 - 15:00 Cambodia Time (ICT / UTC+7)',
       lastSyncTime: this.lastSyncTime,
       isLiveFeedSupported: true,
-      mode: 'Dynamic Reactive Simulation & Live Override',
+      mode: 'MongoDB Unified Reactive Pipeline',
     };
   }
 
-  async getMarketOverview(): Promise<CSXIndexData> {
-    return { ...this.indexData, lastUpdated: this.lastSyncTime };
+  async getDbStatus() {
+    return await mongoDBService.getDbStatus();
   }
 
-  async getAllStocks(): Promise<CSXStock[]> {
+  async getSyncHistory(limit = 15): Promise<SyncLogEntry[]> {
+    return await mongoDBService.getSyncLogs(limit);
+  }
+
+  async getMarketOverview(): Promise<CSXIndexData> {
+    const data = await mongoDBService.getMarketOverview();
+    return { ...data, lastUpdated: this.lastSyncTime };
+  }
+
+  async getAllStocks(options?: StockQueryOptions): Promise<CSXStock[]> {
+    const stocks = await mongoDBService.queryStocks(options);
+    if (stocks.length > 0) {
+      this.stocks = stocks;
+      return stocks;
+    }
     return this.stocks;
   }
 
   async getStock(ticker: string): Promise<CSXStock | null> {
-    const s = this.stocks.find(st => st.ticker.toUpperCase() === ticker.toUpperCase());
-    return s ? { ...s } : null;
+    const s = await mongoDBService.getStockByTicker(ticker);
+    if (s) return s;
+    const found = this.stocks.find(st => st.ticker.toUpperCase() === ticker.toUpperCase());
+    return found ? { ...found } : null;
   }
 
   async updateStockPrice(ticker: string, newPrice: number, customChange?: number, customVolume?: number): Promise<CSXStock> {
@@ -92,6 +131,7 @@ class CSXOfficialDataProvider implements ICSXDataProvider {
       lastPoint.low = Math.min(lastPoint.low, newPrice);
       lastPoint.volume = volume;
       updatedHistory[updatedHistory.length - 1] = lastPoint;
+      await mongoDBService.saveHistoricalPrice(stock.ticker, lastPoint);
     }
 
     // Recompute technical indicators
@@ -130,17 +170,36 @@ class CSXOfficialDataProvider implements ICSXDataProvider {
     this.recalculateIndex();
     this.lastSyncTime = new Date().toISOString();
 
+    // Persist to MongoDB
+    await mongoDBService.upsertStock(updatedStock);
+    await mongoDBService.saveMarketOverview(this.indexData);
+
     return updatedStock;
   }
 
   async syncLiveMarket(customUpdates?: Array<{ ticker: string; price: number; change?: number; volume?: number }>): Promise<{ updatedCount: number; stocks: CSXStock[]; indexData: CSXIndexData }> {
+    const startTime = Date.now();
+    const updatedTickers: string[] = [];
+
     // If specific custom updates are provided, apply them
     if (customUpdates && customUpdates.length > 0) {
       for (const update of customUpdates) {
         if (this.stocks.some(s => s.ticker === update.ticker)) {
           await this.updateStockPrice(update.ticker, update.price, update.change, update.volume);
+          updatedTickers.push(update.ticker);
         }
       }
+
+      await mongoDBService.recordSyncLog({
+        timestamp: new Date().toISOString(),
+        syncType: 'batch_paste',
+        updatedCount: updatedTickers.length,
+        tickers: updatedTickers,
+        status: 'success',
+        details: `Batch synchronized ${updatedTickers.length} securities via live ingestion.`,
+        durationMs: Date.now() - startTime,
+      });
+
       return {
         updatedCount: customUpdates.length,
         stocks: this.stocks,
@@ -148,7 +207,7 @@ class CSXOfficialDataProvider implements ICSXDataProvider {
       };
     }
 
-    // Otherwise, simulate a slight live market tick respecting CSX price limits & tick sizes
+    // Otherwise, simulate a live market continuous auction tick respecting CSX price limits & tick sizes
     let updatedCount = 0;
     for (const stock of this.stocks) {
       // 60% chance of price fluctuation during continuous auction
@@ -161,12 +220,24 @@ class CSXOfficialDataProvider implements ICSXDataProvider {
         newPrice = Math.min(stock.ceilingPrice, Math.max(stock.floorPrice, newPrice));
         if (newPrice !== stock.currentPrice) {
           await this.updateStockPrice(stock.ticker, newPrice);
+          updatedTickers.push(stock.ticker);
           updatedCount++;
         }
       }
     }
 
     this.lastSyncTime = new Date().toISOString();
+
+    await mongoDBService.recordSyncLog({
+      timestamp: this.lastSyncTime,
+      syncType: 'live_auction_tick',
+      updatedCount,
+      tickers: updatedTickers,
+      status: 'success',
+      details: `Live continuous auction tick: updated ${updatedCount} CSX securities.`,
+      durationMs: Date.now() - startTime,
+    });
+
     return {
       updatedCount,
       stocks: this.stocks,
@@ -211,12 +282,14 @@ class CSXOfficialDataProvider implements ICSXDataProvider {
   }
 
   async getHistoricalPrices(ticker: string, timeframe = '6M'): Promise<HistoricalPricePoint[]> {
+    const existing = await mongoDBService.getHistoricalPrices(ticker, timeframe);
+    if (existing && existing.length > 0) {
+      return existing;
+    }
+
     const stock = await this.getStock(ticker);
     if (!stock) return [];
-    
-    // We can filter based on timeframe (1D, 1W, 1M, 3M, 6M, 1Y, 3Y)
-    const all = buildCSXStocks().find(s => s.ticker === ticker)?.technical;
-    // Generate synthetic history for that ticker if not directly in stock
+
     const basePrice = stock.currentPrice;
     let days = 180;
     if (timeframe === '1D') days = 1;
@@ -238,29 +311,31 @@ class CSXOfficialDataProvider implements ICSXDataProvider {
       p = Math.max(100, Math.round(p * (1 + noise) / 10) * 10);
       const high = Math.round(p * 1.01);
       const low = Math.round(p * 0.99);
-      points.push({
+      const pt: HistoricalPricePoint = {
         date: d.toISOString().split('T')[0],
         open: Math.round((high + low) / 2),
         high,
         low,
         close: p,
         volume: Math.round(5000 + Math.random() * 30000),
-      });
+      };
+      points.push(pt);
+      // Persist to MongoDB
+      await mongoDBService.saveHistoricalPrice(ticker, pt);
     }
     if (points.length > 0) {
       points[points.length - 1].close = basePrice;
+      await mongoDBService.saveHistoricalPrice(ticker, points[points.length - 1]);
     }
     return points;
   }
 
   async getNews(ticker?: string): Promise<NewsItem[]> {
-    if (!ticker) return this.news;
-    return this.news.filter(n => !n.ticker || n.ticker.toUpperCase() === ticker.toUpperCase());
+    return await mongoDBService.getNews(ticker);
   }
 
   async getDisclosures(ticker?: string): Promise<CSXDisclosure[]> {
-    if (!ticker) return this.disclosures;
-    return this.disclosures.filter(d => d.ticker.toUpperCase() === ticker.toUpperCase());
+    return await mongoDBService.getDisclosures(ticker);
   }
 
   async getAlerts(): Promise<MarketAlert[]> {
