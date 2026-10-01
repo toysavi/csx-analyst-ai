@@ -1,0 +1,6 @@
+{
+  "name": "CSX AI Analyst",
+  "description": "Institutional-grade AI stock research, forecasting, and news intelligence terminal for the Cambodia Securities Exchange (CSX).",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
