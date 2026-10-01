@@ -18,7 +18,7 @@ COPY . .
 RUN npm run build
 
 # Remove development dependencies natively on builder
-RUN npm prune --production
+RUN npm prune --omit=dev --legacy-peer-deps
 
 # Stage 2: Target runtime image (supports linux/amd64 and linux/arm64)
 FROM node:22-bookworm-slim AS runner

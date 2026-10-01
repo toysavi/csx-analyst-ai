@@ -44,7 +44,7 @@ COPY package*.json ./
 RUN npm install --legacy-peer-deps
 COPY . .
 RUN npm run build
-RUN npm prune --production
+RUN npm prune --omit=dev --legacy-peer-deps
 
 FROM node:22-bookworm-slim AS runner
 WORKDIR /app
