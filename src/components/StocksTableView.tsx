@@ -263,8 +263,13 @@ export const StocksTableView: React.FC<StocksTableViewProps> = ({ stocks, onSele
                   </td>
 
                   {/* Price */}
-                  <td className="py-3 px-3 text-right font-bold text-white">
-                    {formatPrice(stock.currentPrice)}
+                  <td className="py-3 px-3 text-right">
+                    <div className="font-bold text-white text-sm">{formatPrice(stock.currentPrice)}</div>
+                    <div className="text-[10px] text-slate-400 font-mono">
+                      <span>L: {stock.floorPrice ? stock.floorPrice.toLocaleString() : Math.round(stock.currentPrice * 0.9).toLocaleString()}</span>
+                      <span className="mx-1">•</span>
+                      <span>H: {stock.ceilingPrice ? stock.ceilingPrice.toLocaleString() : Math.round(stock.currentPrice * 1.1).toLocaleString()}</span>
+                    </div>
                   </td>
 
                   {/* Daily Change */}

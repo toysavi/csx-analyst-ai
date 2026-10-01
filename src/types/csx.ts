@@ -26,6 +26,9 @@ export interface CSXIndexData {
   unchanged: number;
   lastUpdated: string;
   isMarketOpen: boolean;
+  tradingSession?: string;
+  officialSource?: string;
+  tradingMethod?: string; // 'Automated Auction Trading (AAM)' | 'Negotiated Trading (NTM)'
 }
 
 export interface HistoricalPricePoint {
@@ -242,6 +245,18 @@ export interface CSXStock {
   low52w: number;
   sharesOutstanding: number;
   listingDate: string;
+  ceilingPrice: number; // +10% daily price limit
+  floorPrice: number; // -10% daily price limit
+  tickSize: number; // 10, 20, 50 KHR per CSX rule
+  orderBook?: {
+    bids: { price: number; volume: number }[];
+    asks: { price: number; volume: number }[];
+  };
+  foreignOwnership?: {
+    maxLimitPercent: number;
+    currentPercent: number;
+    remainingRoomShares: number;
+  };
   description: string;
   businessHighlights: string[];
   aiScore: AIScoreBreakdown;

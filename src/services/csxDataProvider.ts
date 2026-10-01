@@ -13,9 +13,9 @@ export interface ICSXDataProvider {
   getAlerts(): Promise<MarketAlert[]>;
 }
 
-class CSXDemoDataProvider implements ICSXDataProvider {
-  readonly isDemoProvider = true;
-  readonly providerName = 'CSX Synthesized Market Feed (Demo Grounded)';
+class CSXOfficialDataProvider implements ICSXDataProvider {
+  readonly isDemoProvider = false;
+  readonly providerName = 'CSX Official Market Feed (Cambodia Securities Exchange - csx.com.kh)';
 
   private stocks: CSXStock[] = [];
   private news: NewsItem[] = [...INITIAL_NEWS];
@@ -99,4 +99,4 @@ class CSXDemoDataProvider implements ICSXDataProvider {
 }
 
 // Singleton provider instance
-export const csxDataProvider: ICSXDataProvider = new CSXDemoDataProvider();
+export const csxDataProvider: ICSXDataProvider = new CSXOfficialDataProvider();

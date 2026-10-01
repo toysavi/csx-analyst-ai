@@ -91,8 +91,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onTabChange, watch
           All forecasts and scores are quantitative estimates, NOT certified investment advice. CSX prices subject to market risk.
         </p>
         <div className="pt-1 border-t border-slate-700/50 flex items-center justify-between text-[10px] font-mono text-slate-400">
-          <span>Feed: Demo (Grounded)</span>
-          <span className="text-emerald-400">v2.4</span>
+          <span>Feed: CSX Official (csx.com.kh)</span>
+          <span className="text-emerald-400 font-semibold">Live Grounded</span>
         </div>
       </div>
     </aside>

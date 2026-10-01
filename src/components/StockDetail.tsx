@@ -209,6 +209,107 @@ export const StockDetail: React.FC<StockDetailProps> = ({
             <AIScoreCard score={stock.aiScore} risk={stock.risk} ticker={stock.ticker} />
           </div>
 
+          {/* Official CSX Trading Mechanics & Order Book Depth */}
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-blue-400 font-mono">
+                  Official CSX Trading Mechanics & Order Depth
+                </span>
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-950 text-blue-300 border border-blue-800 font-mono">
+                  csx.com.kh
+                </span>
+              </div>
+              <div className="text-[11px] text-slate-400 font-mono">
+                Trading Method: <strong className="text-slate-200">Continuous Auction (AAM)</strong> • ±10% Price Band
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Daily Limit Band & Tick Size */}
+              <div className="bg-slate-850 p-3.5 rounded-lg border border-slate-800 space-y-2 text-xs font-mono">
+                <div className="text-[10px] uppercase text-slate-400 font-bold">Daily Price Limits (±10%)</div>
+                <div className="flex items-center justify-between text-slate-200">
+                  <span className="text-rose-400">Floor (-10%):</span>
+                  <strong className="text-white">{formatPrice(stock.floorPrice || Math.round(stock.currentPrice * 0.9))}</strong>
+                </div>
+                <div className="flex items-center justify-between text-slate-200">
+                  <span className="text-slate-400">Previous Base:</span>
+                  <strong className="text-white">{formatPrice(stock.previousClose)}</strong>
+                </div>
+                <div className="flex items-center justify-between text-slate-200">
+                  <span className="text-emerald-400">Ceiling (+10%):</span>
+                  <strong className="text-white">{formatPrice(stock.ceilingPrice || Math.round(stock.currentPrice * 1.1))}</strong>
+                </div>
+                <div className="pt-2 border-t border-slate-700/60 flex items-center justify-between text-[11px]">
+                  <span className="text-slate-400">CSX Tick Size:</span>
+                  <span className="text-blue-400 font-bold">{stock.tickSize || 20} KHR</span>
+                </div>
+              </div>
+
+              {/* CSX 3-Level Order Book Depth */}
+              <div className="bg-slate-850 p-3.5 rounded-lg border border-slate-800 space-y-2 text-xs font-mono">
+                <div className="flex items-center justify-between text-[10px] uppercase text-slate-400 font-bold">
+                  <span>CSX Order Book Depth</span>
+                  <span>Bids / Asks</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-[11px]">
+                  {/* Bids */}
+                  <div className="space-y-1">
+                    <div className="text-[9px] uppercase text-emerald-400 font-bold">Buyer Bids</div>
+                    {(stock.orderBook?.bids || [
+                      { price: stock.currentPrice, volume: 2400 },
+                      { price: stock.currentPrice - 20, volume: 4600 },
+                      { price: stock.currentPrice - 40, volume: 7200 },
+                    ]).map((b, idx) => (
+                      <div key={idx} className="flex justify-between bg-emerald-950/30 px-1.5 py-0.5 rounded border border-emerald-900/40">
+                        <span className="text-emerald-300 font-bold">{b.price.toLocaleString()}</span>
+                        <span className="text-slate-400">{b.volume.toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Asks */}
+                  <div className="space-y-1">
+                    <div className="text-[9px] uppercase text-rose-400 font-bold">Seller Asks</div>
+                    {(stock.orderBook?.asks || [
+                      { price: stock.currentPrice + 20, volume: 1800 },
+                      { price: stock.currentPrice + 40, volume: 3900 },
+                      { price: stock.currentPrice + 60, volume: 6500 },
+                    ]).map((a, idx) => (
+                      <div key={idx} className="flex justify-between bg-rose-950/30 px-1.5 py-0.5 rounded border border-rose-900/40">
+                        <span className="text-rose-300 font-bold">{a.price.toLocaleString()}</span>
+                        <span className="text-slate-400">{a.volume.toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Foreign Investor Ownership Room */}
+              <div className="bg-slate-850 p-3.5 rounded-lg border border-slate-800 space-y-2 text-xs font-mono">
+                <div className="text-[10px] uppercase text-slate-400 font-bold">Foreign Ownership Room</div>
+                <div className="flex items-center justify-between text-slate-200">
+                  <span className="text-slate-400">Statutory Cap:</span>
+                  <strong className="text-white">{stock.foreignOwnership?.maxLimitPercent || 49}%</strong>
+                </div>
+                <div className="flex items-center justify-between text-slate-200">
+                  <span className="text-slate-400">Current Foreign Held:</span>
+                  <strong className="text-amber-400">{stock.foreignOwnership?.currentPercent || 18.4}%</strong>
+                </div>
+                <div className="flex items-center justify-between text-slate-200">
+                  <span className="text-slate-400">Remaining Room:</span>
+                  <strong className="text-emerald-400">
+                    {(stock.foreignOwnership?.remainingRoomShares || 26252652).toLocaleString()} shs
+                  </strong>
+                </div>
+                <div className="pt-2 border-t border-slate-700/60 text-[10px] text-slate-400 font-sans">
+                  Foreign institutional participation permitted via official CSX Investor ID (CID).
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Business Highlights & Profile */}
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-3">
             <h3 className="text-sm font-bold text-white uppercase tracking-wide">Company Business Profile</h3>

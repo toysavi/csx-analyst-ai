@@ -179,6 +179,9 @@ CURRENTLY SELECTED STOCK DEEP DIVE:
 Ticker: ${currentStock.ticker} - ${currentStock.name} (${currentStock.khmerName})
 Market Board: ${currentStock.board} | Sector: ${currentStock.sector} | ISIN: ${currentStock.isin}
 Actual Price: ${currentStock.currentPrice.toLocaleString()} KHR | Change: ${currentStock.change} KHR (${currentStock.changePercent}%) | Volume: ${currentStock.volume.toLocaleString()}
+CSX Price Limits: Floor (-10%) ${currentStock.floorPrice?.toLocaleString()} KHR, Ceiling (+10%) ${currentStock.ceilingPrice?.toLocaleString()} KHR, Official Tick Size: ${currentStock.tickSize} KHR
+Order Book Depth: Bids [${currentStock.orderBook?.bids.map(b => `${b.price.toLocaleString()} (${b.volume.toLocaleString()} shs)`).join(', ')}], Asks [${currentStock.orderBook?.asks.map(a => `${a.price.toLocaleString()} (${a.volume.toLocaleString()} shs)`).join(', ')}]
+Foreign Ownership Room: Cap ${currentStock.foreignOwnership?.maxLimitPercent}%, Currently Held ${currentStock.foreignOwnership?.currentPercent}%, Remaining ${currentStock.foreignOwnership?.remainingRoomShares.toLocaleString()} shares
 P/E: ${currentStock.peRatio} | P/B: ${currentStock.pbRatio} | Dividend Yield: ${currentStock.dividendYieldPercent}% (DPS ${currentStock.dpsKHR} KHR)
 52W High/Low: ${currentStock.high52w.toLocaleString()} / ${currentStock.low52w.toLocaleString()} KHR
 AI Score: ${currentStock.aiScore.overallScore}/100 (${currentStock.aiScore.signal})

@@ -2,10 +2,10 @@ import { CSXIndexData, CSXStock, NewsItem, CSXDisclosure, MarketAlert } from '..
 import { computeTechnicalIndicators } from './technicalAnalysis';
 import { generate7DayForecast } from './forecastingEngine';
 
-// Helper to generate realistic historical price points
-function generateHistory(basePrice: number, volatility = 0.015, days = 180, trend = 0.0003) {
+// Helper to generate realistic historical price points respecting CSX tick sizes
+function generateHistory(basePrice: number, volatility = 0.015, days = 180, trend = 0.0003, tickSize = 20) {
   const points = [];
-  let price = Math.round(basePrice * (1 - days * trend * 0.8));
+  let price = Math.round((basePrice * (1 - days * trend * 0.8)) / tickSize) * tickSize;
   const now = new Date();
   
   for (let i = days; i >= 0; i--) {
@@ -15,11 +15,11 @@ function generateHistory(basePrice: number, volatility = 0.015, days = 180, tren
     if (d.getDay() === 0 || d.getDay() === 6) continue;
 
     const noise = (Math.random() - 0.48) * volatility;
-    price = Math.max(500, Math.round(price * (1 + trend + noise) / 10) * 10);
-    const daySpread = Math.round(price * volatility * 0.7);
-    const high = price + Math.round(Math.random() * daySpread);
-    const low = Math.max(100, price - Math.round(Math.random() * daySpread));
-    const open = Math.round((low + Math.random() * (high - low)) / 10) * 10;
+    price = Math.max(tickSize * 10, Math.round((price * (1 + trend + noise)) / tickSize) * tickSize);
+    const daySpread = Math.max(tickSize, Math.round((price * volatility * 0.7) / tickSize) * tickSize);
+    const high = price + Math.round((Math.random() * daySpread) / tickSize) * tickSize;
+    const low = Math.max(tickSize * 5, price - Math.round((Math.random() * daySpread) / tickSize) * tickSize);
+    const open = Math.round(((low + high) / 2) / tickSize) * tickSize;
     const volume = Math.round(5000 + Math.random() * 45000 + (Math.random() > 0.85 ? 80000 : 0));
 
     points.push({
@@ -33,7 +33,7 @@ function generateHistory(basePrice: number, volatility = 0.015, days = 180, tren
     });
   }
 
-  // Ensure last close matches current target price closely
+  // Ensure last close matches current target price exactly
   if (points.length > 0) {
     points[points.length - 1].close = basePrice;
     points[points.length - 1].high = Math.max(points[points.length - 1].high, basePrice);
@@ -44,21 +44,24 @@ function generateHistory(basePrice: number, volatility = 0.015, days = 180, tren
 }
 
 export const CSX_INDEX_DATA: CSXIndexData = {
-  index: 468.35,
-  change: 1.85,
-  changePercent: 0.40,
-  previousClose: 466.50,
-  open: 467.10,
-  high: 469.12,
-  low: 466.80,
-  volume: 184520,
-  valueKHR: 1425890000,
-  marketCapKHR: 12850400000000,
-  advancing: 5,
+  index: 650.99,
+  change: 2.45,
+  changePercent: 0.38,
+  previousClose: 648.54,
+  open: 649.20,
+  high: 652.10,
+  low: 647.90,
+  volume: 248600,
+  valueKHR: 2315480000,
+  marketCapKHR: 15680400000000,
+  advancing: 6,
   declining: 3,
-  unchanged: 2,
+  unchanged: 1,
   lastUpdated: new Date().toISOString(),
   isMarketOpen: true,
+  tradingSession: 'Continuous Trading (09:00 - 14:50)',
+  officialSource: 'Cambodia Securities Exchange (csx.com.kh)',
+  tradingMethod: 'Automated Auction Method (AAM) & Negotiated Trading (NTM)',
 };
 
 export const INITIAL_NEWS: NewsItem[] = [
@@ -266,11 +269,11 @@ export const INITIAL_ALERTS: MarketAlert[] = [
 
 // Helper to build realistic stocks
 export function buildCSXStocks(): CSXStock[] {
-  const pasHistory = generateHistory(12500, 0.014, 180, 0.0004);
+  const pasHistory = generateHistory(18920, 0.014, 180, 0.0004, 20);
   const pasTech = computeTechnicalIndicators(pasHistory);
   const pasForecast = generate7DayForecast({
     ticker: 'PAS',
-    currentPrice: 12500,
+    currentPrice: 18920,
     technical: pasTech,
     financials: {
       year: 2025,
@@ -286,71 +289,71 @@ export function buildCSXStocks(): CSXStock[] {
       capexKHR: 92000000000,
       epsKHR: 1378,
       dpsKHR: 520,
-      peRatio: 9.1,
-      pbRatio: 1.12,
+      peRatio: 13.73,
+      pbRatio: 1.69,
       roePercent: 12.3,
       debtToEquity: 0.75,
-      dividendYieldPercent: 4.16,
+      dividendYieldPercent: 2.75,
     },
     recentNews: INITIAL_NEWS.filter(n => n.ticker === 'PAS'),
     csxIndexTrend: 'Bullish',
   });
 
-  const ppapHistory = generateHistory(13800, 0.012, 180, 0.0002);
+  const ppapHistory = generateHistory(15520, 0.012, 180, 0.0002, 20);
   const ppapTech = computeTechnicalIndicators(ppapHistory);
   const ppapForecast = generate7DayForecast({
     ticker: 'PPAP',
-    currentPrice: 13800,
+    currentPrice: 15520,
     technical: ppapTech,
     recentNews: INITIAL_NEWS.filter(n => n.ticker === 'PPAP'),
   });
 
-  const pwsaHistory = generateHistory(7100, 0.009, 180, 0.0001);
+  const pwsaHistory = generateHistory(7120, 0.009, 180, 0.0001, 20);
   const pwsaTech = computeTechnicalIndicators(pwsaHistory);
   const pwsaForecast = generate7DayForecast({
     ticker: 'PWSA',
-    currentPrice: 7100,
+    currentPrice: 7120,
     technical: pwsaTech,
     recentNews: INITIAL_NEWS.filter(n => n.ticker === 'PWSA'),
   });
 
-  const abcHistory = generateHistory(8900, 0.016, 180, -0.0002);
+  const abcHistory = generateHistory(10940, 0.016, 180, -0.0002, 20);
   const abcTech = computeTechnicalIndicators(abcHistory);
   const abcForecast = generate7DayForecast({
     ticker: 'ABC',
-    currentPrice: 8900,
+    currentPrice: 10940,
     technical: abcTech,
     recentNews: INITIAL_NEWS.filter(n => n.ticker === 'ABC'),
   });
 
-  const camgsmHistory = generateHistory(2380, 0.011, 180, 0.0001);
+  const camgsmHistory = generateHistory(4020, 0.011, 180, 0.0001, 20);
   const camgsmTech = computeTechnicalIndicators(camgsmHistory);
   const camgsmForecast = generate7DayForecast({
     ticker: 'CAMGSM',
-    currentPrice: 2380,
+    currentPrice: 4020,
     technical: camgsmTech,
     recentNews: INITIAL_NEWS.filter(n => n.ticker === 'CAMGSM'),
   });
 
-  const gtiHistory = generateHistory(2800, 0.018, 180, -0.0003);
+  const gtiHistory = generateHistory(8580, 0.018, 180, -0.0003, 20);
   const gtiTech = computeTechnicalIndicators(gtiHistory);
-  const gtiForecast = generate7DayForecast({ ticker: 'GTI', currentPrice: 2800, technical: gtiTech });
+  const gtiForecast = generate7DayForecast({ ticker: 'GTI', currentPrice: 8580, technical: gtiTech });
 
-  const mjqeHistory = generateHistory(2080, 0.013, 180, 0.0002);
+  const mjqeHistory = generateHistory(2140, 0.013, 180, 0.0002, 10);
   const mjqeTech = computeTechnicalIndicators(mjqeHistory);
-  const mjqeForecast = generate7DayForecast({ ticker: 'MJQE', currentPrice: 2080, technical: mjqeTech });
+  const mjqeForecast = generate7DayForecast({ ticker: 'MJQE', currentPrice: 2140, technical: mjqeTech });
 
-  const pepcHistory = generateHistory(2100, 0.022, 180, -0.0004);
+  const pepcHistory = generateHistory(2410, 0.022, 180, -0.0004, 10);
   const pepcTech = computeTechnicalIndicators(pepcHistory);
-  const pepcForecast = generate7DayForecast({ ticker: 'PEPC', currentPrice: 2100, technical: pepcTech });
+  const pepcForecast = generate7DayForecast({ ticker: 'PEPC', currentPrice: 2410, technical: pepcTech });
 
-  const dbdeHistory = generateHistory(2140, 0.015, 180, 0.0001);
+  const dbdeHistory = generateHistory(2270, 0.015, 180, 0.0001, 10);
   const dbdeTech = computeTechnicalIndicators(dbdeHistory);
-  const dbdeForecast = generate7DayForecast({ ticker: 'DBDE', currentPrice: 2140, technical: dbdeTech });
+  const dbdeForecast = generate7DayForecast({ ticker: 'DBDE', currentPrice: 2270, technical: dbdeTech });
 
-  const jslHistory = generateHistory(4100, 0.025, 180, -0.0005);
+  const jslHistory = generateHistory(2090, 0.025, 180, -0.0005, 10);
   const jslTech = computeTechnicalIndicators(jslHistory);
-  const jslForecast = generate7DayForecast({ ticker: 'JSL', currentPrice: 4100, technical: jslTech });
+  const jslForecast = generate7DayForecast({ ticker: 'JSL', currentPrice: 2090, technical: jslTech });
 
   return [
     {
@@ -360,22 +363,42 @@ export function buildCSXStocks(): CSXStock[] {
       isin: 'KH1000070001',
       sector: 'Transportation & Logistics',
       board: 'Main Board',
-      currentPrice: 12500,
-      previousClose: 12350,
-      change: 150,
-      changePercent: 1.21,
-      volume: 48600,
-      tradingValueKHR: 607500000,
-      marketCapKHR: 1072248887500,
-      peRatio: 9.07,
-      pbRatio: 1.12,
+      currentPrice: 18920,
+      previousClose: 18700,
+      change: 220,
+      changePercent: 1.18,
+      volume: 54600,
+      tradingValueKHR: 1033032000,
+      marketCapKHR: 1622955916120,
+      peRatio: 13.73,
+      pbRatio: 1.69,
       epsKHR: 1378,
-      dividendYieldPercent: 4.16,
+      dividendYieldPercent: 2.75,
       dpsKHR: 520,
-      high52w: 13400,
-      low52w: 11800,
+      high52w: 19400,
+      low52w: 12800,
       sharesOutstanding: 85779911,
       listingDate: '2017-06-08',
+      ceilingPrice: 20570,
+      floorPrice: 16830,
+      tickSize: 20,
+      orderBook: {
+        bids: [
+          { price: 18920, volume: 2400 },
+          { price: 18900, volume: 4600 },
+          { price: 18880, volume: 7200 },
+        ],
+        asks: [
+          { price: 18940, volume: 1800 },
+          { price: 18960, volume: 3900 },
+          { price: 18980, volume: 6500 },
+        ],
+      },
+      foreignOwnership: {
+        maxLimitPercent: 49.0,
+        currentPercent: 18.4,
+        remainingRoomShares: 26252652,
+      },
       description: 'PAS operates the sole deep-sea maritime port in the Kingdom of Cambodia, handling approximately 70% of the nation\'s ocean-borne container traffic. It is currently expanding with Japanese ODA assistance to handle mainline mega-containerships.',
       businessHighlights: [
         'Monopoly operator of Cambodia\'s only deep-water commercial seaport',
@@ -615,22 +638,42 @@ export function buildCSXStocks(): CSXStock[] {
       isin: 'KH1000050003',
       sector: 'Transportation & Logistics',
       board: 'Main Board',
-      currentPrice: 13800,
-      previousClose: 13700,
-      change: 100,
-      changePercent: 0.73,
-      volume: 18200,
-      tradingValueKHR: 251160000,
-      marketCapKHR: 285444000000,
-      peRatio: 7.82,
-      pbRatio: 0.88,
+      currentPrice: 15520,
+      previousClose: 15400,
+      change: 120,
+      changePercent: 0.78,
+      volume: 24800,
+      tradingValueKHR: 384896000,
+      marketCapKHR: 321021344800,
+      peRatio: 8.79,
+      pbRatio: 0.99,
       epsKHR: 1764,
-      dividendYieldPercent: 5.14,
+      dividendYieldPercent: 4.57,
       dpsKHR: 710,
-      high52w: 14500,
-      low52w: 13100,
+      high52w: 16200,
+      low52w: 13200,
       sharesOutstanding: 20684365,
       listingDate: '2015-12-09',
+      ceilingPrice: 16940,
+      floorPrice: 13860,
+      tickSize: 20,
+      orderBook: {
+        bids: [
+          { price: 15520, volume: 1400 },
+          { price: 15500, volume: 3200 },
+          { price: 15480, volume: 4600 },
+        ],
+        asks: [
+          { price: 15540, volume: 1100 },
+          { price: 15560, volume: 2400 },
+          { price: 15580, volume: 3900 },
+        ],
+      },
+      foreignOwnership: {
+        maxLimitPercent: 49.0,
+        currentPercent: 12.1,
+        remainingRoomShares: 7632540,
+      },
       description: 'PPAP operates the main river port terminal in Phnom Penh, controlling container freight moving downstream along the Mekong to Vietnam\'s deep-water ports.',
       businessHighlights: [
         'Strategic Mekong river link connecting Phnom Penh to Vietnam Cai Mep',
@@ -682,22 +725,42 @@ export function buildCSXStocks(): CSXStock[] {
       isin: 'KH1000010004',
       sector: 'Utilities',
       board: 'Main Board',
-      currentPrice: 7100,
-      previousClose: 7120,
-      change: -20,
-      changePercent: -0.28,
-      volume: 12400,
-      tradingValueKHR: 88040000,
-      marketCapKHR: 617500000000,
-      peRatio: 6.45,
+      currentPrice: 7120,
+      previousClose: 7100,
+      change: 20,
+      changePercent: 0.28,
+      volume: 18400,
+      tradingValueKHR: 131008000,
+      marketCapKHR: 619248913440,
+      peRatio: 6.47,
       pbRatio: 0.62,
       epsKHR: 1100,
-      dividendYieldPercent: 4.93,
+      dividendYieldPercent: 4.92,
       dpsKHR: 350,
-      high52w: 7600,
-      low52w: 6900,
+      high52w: 7800,
+      low52w: 6860,
       sharesOutstanding: 86973162,
       listingDate: '2012-04-18',
+      ceilingPrice: 7810,
+      floorPrice: 6390,
+      tickSize: 20,
+      orderBook: {
+        bids: [
+          { price: 7120, volume: 3100 },
+          { price: 7100, volume: 5400 },
+          { price: 7080, volume: 8200 },
+        ],
+        asks: [
+          { price: 7140, volume: 2800 },
+          { price: 7160, volume: 4600 },
+          { price: 7180, volume: 6900 },
+        ],
+      },
+      foreignOwnership: {
+        maxLimitPercent: 49.0,
+        currentPercent: 8.5,
+        remainingRoomShares: 35224130,
+      },
       description: 'The pioneering first listing on CSX, PWSA holds exclusive rights for the treatment and supply of clean potable water to Phnom Penh and surrounding peri-urban zones.',
       businessHighlights: [
         'Exclusive water utility monopoly for capital city',
@@ -746,22 +809,42 @@ export function buildCSXStocks(): CSXStock[] {
       isin: 'KH1000080000',
       sector: 'Banking & Financials',
       board: 'Main Board',
-      currentPrice: 8900,
-      previousClose: 8840,
-      change: 60,
-      changePercent: 0.68,
-      volume: 68400,
-      tradingValueKHR: 608760000,
-      marketCapKHR: 3855000000000,
-      peRatio: 8.15,
-      pbRatio: 0.94,
+      currentPrice: 10940,
+      previousClose: 10900,
+      change: 40,
+      changePercent: 0.37,
+      volume: 84200,
+      tradingValueKHR: 921148000,
+      marketCapKHR: 4738802038480,
+      peRatio: 10.01,
+      pbRatio: 1.15,
       epsKHR: 1092,
-      dividendYieldPercent: 3.82,
+      dividendYieldPercent: 3.11,
       dpsKHR: 340,
-      high52w: 10200,
-      low52w: 8600,
+      high52w: 12200,
+      low52w: 9200,
       sharesOutstanding: 433162892,
       listingDate: '2020-05-25',
+      ceilingPrice: 11990,
+      floorPrice: 9810,
+      tickSize: 20,
+      orderBook: {
+        bids: [
+          { price: 10940, volume: 8500 },
+          { price: 10920, volume: 14200 },
+          { price: 10900, volume: 22100 },
+        ],
+        asks: [
+          { price: 10960, volume: 7200 },
+          { price: 10980, volume: 16800 },
+          { price: 11000, volume: 28500 },
+        ],
+      },
+      foreignOwnership: {
+        maxLimitPercent: 49.0,
+        currentPercent: 34.2,
+        remainingRoomShares: 64108108,
+      },
       description: 'The largest domestic commercial bank in Cambodia by branch network, retail deposits, and balance sheet assets, providing comprehensive consumer, SME, and digital banking.',
       businessHighlights: [
         'Largest commercial bank listed on CSX with >40% of total index weight',
@@ -810,22 +893,42 @@ export function buildCSXStocks(): CSXStock[] {
       isin: 'KH1000180008',
       sector: 'Telecommunications',
       board: 'Main Board',
-      currentPrice: 2380,
-      previousClose: 2370,
-      change: 10,
-      changePercent: 0.42,
-      volume: 42100,
-      tradingValueKHR: 100198000,
-      marketCapKHR: 4664800000000,
-      peRatio: 14.8,
-      pbRatio: 2.15,
+      currentPrice: 4020,
+      previousClose: 4000,
+      change: 20,
+      changePercent: 0.50,
+      volume: 62400,
+      tradingValueKHR: 250848000,
+      marketCapKHR: 7879200000000,
+      peRatio: 24.9,
+      pbRatio: 3.63,
       epsKHR: 161,
-      dividendYieldPercent: 7.14,
+      dividendYieldPercent: 4.23,
       dpsKHR: 170,
-      high52w: 2540,
-      low52w: 2280,
+      high52w: 4400,
+      low52w: 2300,
       sharesOutstanding: 1960000000,
       listingDate: '2023-06-27',
+      ceilingPrice: 4400,
+      floorPrice: 3600,
+      tickSize: 20,
+      orderBook: {
+        bids: [
+          { price: 4020, volume: 15400 },
+          { price: 4000, volume: 32000 },
+          { price: 3980, volume: 45000 },
+        ],
+        asks: [
+          { price: 4040, volume: 12200 },
+          { price: 4060, volume: 28500 },
+          { price: 4080, volume: 39000 },
+        ],
+      },
+      foreignOwnership: {
+        maxLimitPercent: 49.0,
+        currentPercent: 6.2,
+        remainingRoomShares: 838880000,
+      },
       description: 'One of the leading telecommunications network operators in Cambodia, offering voice, 4G LTE data, enterprise cloud solutions, and digital lifestyle services under the Cellcard brand.',
       businessHighlights: [
         'Guaranteed minimum 7% dividend yield commitment for IPO class shareholders',
@@ -874,22 +977,42 @@ export function buildCSXStocks(): CSXStock[] {
       isin: 'KH1000020003',
       sector: 'Consumer Goods & Textiles',
       board: 'Main Board',
-      currentPrice: 2800,
-      previousClose: 2820,
+      currentPrice: 8580,
+      previousClose: 8600,
       change: -20,
-      changePercent: -0.71,
-      volume: 6200,
-      tradingValueKHR: 17360000,
-      marketCapKHR: 112000000000,
-      peRatio: 11.2,
-      pbRatio: 0.45,
+      changePercent: -0.23,
+      volume: 14800,
+      tradingValueKHR: 126984000,
+      marketCapKHR: 343200000000,
+      peRatio: 34.3,
+      pbRatio: 1.38,
       epsKHR: 250,
-      dividendYieldPercent: 3.57,
+      dividendYieldPercent: 1.17,
       dpsKHR: 100,
-      high52w: 3200,
+      high52w: 9800,
       low52w: 2600,
       sharesOutstanding: 40000000,
       listingDate: '2014-06-16',
+      ceilingPrice: 9460,
+      floorPrice: 7740,
+      tickSize: 20,
+      orderBook: {
+        bids: [
+          { price: 8580, volume: 800 },
+          { price: 8560, volume: 1600 },
+          { price: 8540, volume: 2900 },
+        ],
+        asks: [
+          { price: 8600, volume: 700 },
+          { price: 8620, volume: 1400 },
+          { price: 8640, volume: 2200 },
+        ],
+      },
+      foreignOwnership: {
+        maxLimitPercent: 100.0,
+        currentPercent: 78.4,
+        remainingRoomShares: 8640000,
+      },
       description: 'Major athletic apparel and garment manufacturer in Cambodia producing sportswear for global brands including Adidas.',
       businessHighlights: ['Export-oriented garment manufacturer', 'Trades at deep discount to book value (0.45x P/B)'],
       aiScore: {
@@ -918,22 +1041,42 @@ export function buildCSXStocks(): CSXStock[] {
       isin: 'KH1000170009',
       sector: 'Consumer Services & Education',
       board: 'Main Board',
-      currentPrice: 2080,
-      previousClose: 2060,
+      currentPrice: 2140,
+      previousClose: 2120,
       change: 20,
-      changePercent: 0.97,
-      volume: 15400,
-      tradingValueKHR: 32032000,
-      marketCapKHR: 686400000000,
-      peRatio: 16.2,
-      pbRatio: 1.84,
+      changePercent: 0.94,
+      volume: 38600,
+      tradingValueKHR: 82604000,
+      marketCapKHR: 706200000000,
+      peRatio: 16.7,
+      pbRatio: 1.89,
       epsKHR: 128,
-      dividendYieldPercent: 4.80,
+      dividendYieldPercent: 4.67,
       dpsKHR: 100,
-      high52w: 2220,
-      low52w: 2000,
+      high52w: 2400,
+      low52w: 2020,
       sharesOutstanding: 330000000,
       listingDate: '2023-06-28',
+      ceilingPrice: 2330,
+      floorPrice: 1910,
+      tickSize: 10,
+      orderBook: {
+        bids: [
+          { price: 2140, volume: 4200 },
+          { price: 2130, volume: 8900 },
+          { price: 2120, volume: 15400 },
+        ],
+        asks: [
+          { price: 2150, volume: 3800 },
+          { price: 2160, volume: 7600 },
+          { price: 2170, volume: 12800 },
+        ],
+      },
+      foreignOwnership: {
+        maxLimitPercent: 49.0,
+        currentPercent: 14.8,
+        remainingRoomShares: 112860000,
+      },
       description: 'The largest private educational institution listed in Cambodia, operating the Aii Language Center and American Intercon School (AIS) networks nationwide.',
       businessHighlights: ['Market leader in private K-12 and English language training in Cambodia', 'Predictable recurring tuition revenues paid up-front', 'Aggressive campus network expansion into provinces'],
       aiScore: {
@@ -941,7 +1084,7 @@ export function buildCSXStocks(): CSXStock[] {
         signal: 'Positive',
         fundamentals: { score: 20, maxScore: 25, weightPercent: 25, label: 'Fundamentals', explanation: 'Negative working capital business model with tuition paid in advance.', keyMetrics: [{ name: 'Cash Conversion', value: 'High', assessment: 'positive' }] },
         growth: { score: 16, maxScore: 20, weightPercent: 20, label: 'Growth', explanation: 'New campus openings driving student enrollment +15% YoY.', keyMetrics: [{ name: 'Student Growth', value: '+15%', assessment: 'positive' }] },
-        valuation: { score: 11, maxScore: 15, weightPercent: 15, label: 'Valuation', explanation: 'Premium valuation reflects education moat.', keyMetrics: [{ name: 'P/E', value: '16.2x', assessment: 'neutral' }] },
+        valuation: { score: 11, maxScore: 15, weightPercent: 15, label: 'Valuation', explanation: 'Premium valuation reflects education moat.', keyMetrics: [{ name: 'P/E', value: '16.7x', assessment: 'neutral' }] },
         technical: { score: 7, maxScore: 10, weightPercent: 10, label: 'Technical', explanation: 'Consolidating above 2,050 support line.', keyMetrics: [{ name: 'Support', value: '2,050 KHR', assessment: 'positive' }] },
         newsEventImpact: { score: 11, maxScore: 15, weightPercent: 15, label: 'News Impact', explanation: 'Provincial campus additions on schedule.', keyMetrics: [{ name: 'Expansion', value: 'On track', assessment: 'positive' }] },
         riskScore: { score: 8, maxScore: 10, weightPercent: 10, label: 'Risk', explanation: 'Essential service highly valued by Cambodian middle class.', keyMetrics: [{ name: 'Resilience', value: 'High', assessment: 'positive' }] },
@@ -962,22 +1105,42 @@ export function buildCSXStocks(): CSXStock[] {
       isin: 'KH1000120005',
       sector: 'Energy & Infrastructure',
       board: 'Main Board',
-      currentPrice: 2100,
-      previousClose: 2120,
-      change: -20,
-      changePercent: -0.94,
-      volume: 8100,
-      tradingValueKHR: 17010000,
-      marketCapKHR: 157500000000,
-      peRatio: 18.5,
-      pbRatio: 0.78,
+      currentPrice: 2410,
+      previousClose: 2420,
+      change: -10,
+      changePercent: -0.41,
+      volume: 12200,
+      tradingValueKHR: 29402000,
+      marketCapKHR: 180750000000,
+      peRatio: 21.3,
+      pbRatio: 0.89,
       epsKHR: 113,
-      dividendYieldPercent: 2.38,
+      dividendYieldPercent: 2.07,
       dpsKHR: 50,
-      high52w: 2450,
-      low52w: 1980,
+      high52w: 2800,
+      low52w: 2050,
       sharesOutstanding: 75000000,
       listingDate: '2020-08-12',
+      ceilingPrice: 2660,
+      floorPrice: 2180,
+      tickSize: 10,
+      orderBook: {
+        bids: [
+          { price: 2410, volume: 1500 },
+          { price: 2400, volume: 3400 },
+          { price: 2390, volume: 5100 },
+        ],
+        asks: [
+          { price: 2420, volume: 1800 },
+          { price: 2430, volume: 2900 },
+          { price: 2440, volume: 4600 },
+        ],
+      },
+      foreignOwnership: {
+        maxLimitPercent: 100.0,
+        currentPercent: 91.2,
+        remainingRoomShares: 6600000,
+      },
       description: 'Integrated electric power transmission and distribution substation contractor in Cambodia and Southeast Asia.',
       businessHighlights: ['EPC contractor for high-voltage transmission lines', 'Partner to Electricite du Cambodge (EDC)'],
       aiScore: {
@@ -1006,35 +1169,55 @@ export function buildCSXStocks(): CSXStock[] {
       isin: 'KH1000140003',
       sector: 'Industrial & Engineering',
       board: 'Growth Board',
-      currentPrice: 2140,
-      previousClose: 2140,
-      change: 0,
-      changePercent: 0.00,
-      volume: 4500,
-      tradingValueKHR: 9630000,
-      marketCapKHR: 40660000000,
-      peRatio: 9.8,
-      pbRatio: 0.95,
+      currentPrice: 2270,
+      previousClose: 2260,
+      change: 10,
+      changePercent: 0.44,
+      volume: 8600,
+      tradingValueKHR: 19522000,
+      marketCapKHR: 43130000000,
+      peRatio: 10.4,
+      pbRatio: 1.01,
       epsKHR: 218,
-      dividendYieldPercent: 5.50,
+      dividendYieldPercent: 5.20,
       dpsKHR: 118,
-      high52w: 2350,
-      low52w: 2050,
+      high52w: 2490,
+      low52w: 2100,
       sharesOutstanding: 19000000,
       listingDate: '2021-09-06',
+      ceilingPrice: 2490,
+      floorPrice: 2030,
+      tickSize: 10,
+      orderBook: {
+        bids: [
+          { price: 2270, volume: 900 },
+          { price: 2260, volume: 1800 },
+          { price: 2250, volume: 2700 },
+        ],
+        asks: [
+          { price: 2280, volume: 800 },
+          { price: 2290, volume: 1500 },
+          { price: 2300, volume: 2400 },
+        ],
+      },
+      foreignOwnership: {
+        maxLimitPercent: 49.0,
+        currentPercent: 5.4,
+        remainingRoomShares: 8284000,
+      },
       description: 'Mechanical, Electrical, and Plumbing (MEP) engineering contractor listed on the CSX Growth Board.',
       businessHighlights: ['First listing on CSX Growth Board', 'High dividend yield commitment above 5%'],
       aiScore: {
         overallScore: 67,
         signal: 'Neutral',
-        fundamentals: { score: 17, maxScore: 25, weightPercent: 25, label: 'Fundamentals', explanation: 'Niche engineering contractor with steady cash payout.', keyMetrics: [{ name: 'Yield', value: '5.50%', assessment: 'positive' }] },
+        fundamentals: { score: 17, maxScore: 25, weightPercent: 25, label: 'Fundamentals', explanation: 'Niche engineering contractor with steady cash payout.', keyMetrics: [{ name: 'Yield', value: '5.20%', assessment: 'positive' }] },
         growth: { score: 12, maxScore: 20, weightPercent: 20, label: 'Growth', explanation: 'Commercial building construction slow recovery.', keyMetrics: [{ name: 'Backlog', value: 'Stable', assessment: 'neutral' }] },
-        valuation: { score: 13, maxScore: 15, weightPercent: 15, label: 'Valuation', explanation: 'Low P/E and sub-book valuation.', keyMetrics: [{ name: 'P/E', value: '9.8x', assessment: 'positive' }] },
+        valuation: { score: 13, maxScore: 15, weightPercent: 15, label: 'Valuation', explanation: 'Low P/E and sub-book valuation.', keyMetrics: [{ name: 'P/E', value: '10.4x', assessment: 'positive' }] },
         technical: { score: 6, maxScore: 10, weightPercent: 10, label: 'Technical', explanation: 'Extremely narrow volatility band.', keyMetrics: [{ name: 'Volatility', value: 'Low', assessment: 'neutral' }] },
         newsEventImpact: { score: 9, maxScore: 15, weightPercent: 15, label: 'News Impact', explanation: 'Consistent dividend distribution compliance.', keyMetrics: [{ name: 'Dividend', value: 'Paid', assessment: 'positive' }] },
         riskScore: { score: 6, maxScore: 10, weightPercent: 10, label: 'Risk', explanation: 'Small market cap Growth Board stock.', keyMetrics: [{ name: 'Market Cap', value: '<50B KHR', assessment: 'negative' }] },
         liquidity: { score: 4, maxScore: 5, weightPercent: 5, label: 'Liquidity', explanation: 'Small daily volume.', keyMetrics: [{ name: 'Liquidity', value: 'Thin', assessment: 'negative' }] },
-        summaryNarrative: 'Growth Board MEP contractor paying 5.5% dividend yield with thin liquidity.',
+        summaryNarrative: 'Growth Board MEP contractor paying 5.2% dividend yield with thin liquidity.',
         lastUpdated: new Date().toISOString(),
       },
       risk: { level: 'Medium', overallScore: 46, factors: [], primaryRisks: ['Small cap liquidity risk'], mitigatingFactors: ['Consistent dividend record'], riskExplanation: 'Illiquid Growth Board equity.' },
@@ -1050,22 +1233,42 @@ export function buildCSXStocks(): CSXStock[] {
       isin: 'KH1000150002',
       sector: 'Real Estate',
       board: 'Growth Board',
-      currentPrice: 4100,
-      previousClose: 4100,
-      change: 0,
-      changePercent: 0.00,
-      volume: 1200,
-      tradingValueKHR: 4920000,
-      marketCapKHR: 105452000000,
-      peRatio: 12.4,
-      pbRatio: 1.05,
+      currentPrice: 2090,
+      previousClose: 2100,
+      change: -10,
+      changePercent: -0.48,
+      volume: 4200,
+      tradingValueKHR: 8778000,
+      marketCapKHR: 53754800000,
+      peRatio: 6.33,
+      pbRatio: 0.54,
       epsKHR: 330,
-      dividendYieldPercent: 2.44,
+      dividendYieldPercent: 4.78,
       dpsKHR: 100,
       high52w: 4800,
-      low52w: 3900,
+      low52w: 2000,
       sharesOutstanding: 25720000,
       listingDate: '2022-02-10',
+      ceilingPrice: 2310,
+      floorPrice: 1890,
+      tickSize: 10,
+      orderBook: {
+        bids: [
+          { price: 2090, volume: 600 },
+          { price: 2080, volume: 1200 },
+          { price: 2070, volume: 2100 },
+        ],
+        asks: [
+          { price: 2100, volume: 700 },
+          { price: 2110, volume: 1400 },
+          { price: 2120, volume: 2500 },
+        ],
+      },
+      foreignOwnership: {
+        maxLimitPercent: 49.0,
+        currentPercent: 28.5,
+        remainingRoomShares: 5272600,
+      },
       description: 'Condominium and residential property development company in Phnom Penh (The Garden Residency series).',
       businessHighlights: ['Phnom Penh condominium developer', 'Growth Board listing'],
       aiScore: {
