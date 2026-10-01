@@ -37,26 +37,25 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     { name: 'backtest_strategy(stock, params)', description: 'Runs historical simulation and tracks forecast accuracy metrics' },
   ];
 
-  const dockerfileSnippet = `# Production Dockerfile for CSX AI Analyst
-FROM node:22-alpine AS builder
+  const dockerfileSnippet = `# Multi-Arch Dockerfile for CSX AI Analyst (amd64 + arm64)
+FROM --platform=$BUILDPLATFORM node:22-bookworm-slim AS builder
 WORKDIR /app
 COPY package*.json ./
 RUN npm install --legacy-peer-deps
 COPY . .
 RUN npm run build
+RUN npm prune --production
 
-FROM node:22-alpine AS runner
+FROM node:22-bookworm-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
-COPY package*.json ./
-RUN npm install --omit=dev --legacy-peer-deps
+COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/server.ts ./server.ts
-COPY --from=builder /app/src ./src
 
 EXPOSE 3000
-CMD ["npm", "start"]`;
+CMD ["node", "dist/server.js"]`;
 
   const githubActionsWorkflow = `name: Build and Push Docker Image to GitHub Container Registry
 
