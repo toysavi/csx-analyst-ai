@@ -200,28 +200,71 @@ app.post('/api/csx/run-daily-pipeline', async (_req: Request, res: Response) => 
   }
 });
 
-// 9. AI Chat Endpoint (Grounded with real CSX data)
+// 9. AI Chat Endpoint (Grounded with real CSX data & DevOps deployment mode)
 app.post('/api/ai/chat', async (req: Request, res: Response) => {
   try {
-    const { message, selectedStockTicker, conversationHistory } = req.body;
+    const { message, selectedStockTicker, conversationHistory, chatMode } = req.body;
     if (!message) {
       return res.status(400).json({ error: 'Message is required' });
     }
 
-    const allStocks = await csxDataProvider.getAllStocks();
-    const overview = await csxDataProvider.getMarketOverview();
-    const news = await csxDataProvider.getNews();
+    const isDevOpsQuery = chatMode === 'devops' || 
+      /argo|traefik|cert|k8s|kubernetes|ingress|fqdn|toysavi|domain|tls|ssl|deploy|github\.com/i.test(message);
 
-    // Context preparation
-    const stockSummaries = allStocks.map(s => 
-      `${s.ticker} (${s.name}): Price ${s.currentPrice.toLocaleString()} KHR (${s.change >= 0 ? '+' : ''}${s.changePercent}%), AI Score ${s.aiScore.overallScore}/100 [${s.aiScore.signal}], Risk ${s.risk.level}, 7D Target: ${s.forecast7Day.targetPrice7Day.toLocaleString()} KHR (${s.forecast7Day.confidenceScore}% conf, Range ${s.forecast7Day.dailyBreakdown[7]?.lowerRange.toLocaleString()}-${s.forecast7Day.dailyBreakdown[7]?.upperRange.toLocaleString()} KHR), P/E: ${s.peRatio || 'N/A'}, Div Yield: ${s.dividendYieldPercent || 'N/A'}%`
-    ).join('\n');
+    let systemInstruction = '';
 
-    let specificStockContext = '';
-    if (selectedStockTicker) {
-      const currentStock = allStocks.find(s => s.ticker.toUpperCase() === selectedStockTicker.toUpperCase());
-      if (currentStock) {
-        specificStockContext = `
+    if (isDevOpsQuery) {
+      systemInstruction = `
+You are the Senior DevOps & GitOps Platform Engineer assistant for the repository "https://github.com/toysavi/csx-analyst-ai.git".
+You specialize in Kubernetes, ArgoCD GitOps, Traefik v2/v3 Ingress & IngressRoute, and Cert-Manager Let's Encrypt automated TLS.
+
+TARGET INFRASTRUCTURE PROFILE:
+- GitHub Repository: https://github.com/toysavi/csx-analyst-ai.git
+- Target FQDN: csx.toysavi.com
+- Docker Registry Image: ghcr.io/toysavi/csx-analyst-ai:latest
+- Ingress Controller: Traefik (entryPoints: "websecure" for HTTPS, "web" for HTTP)
+- TLS Certificate Manager: cert-manager.io (ClusterIssuer: "letsencrypt-prod")
+- TLS Secret Name: csx-toysavi-tls
+- Target Kubernetes Namespace: csx-analyst
+- ArgoCD Path: k8s
+- Container Port: 3000 | Service Port: 80 -> 3000 (ClusterIP)
+- Required Environment Variables: GEMINI_API_KEY (mounted from secret "csx-analyst-secrets"), PORT=3000, NODE_ENV=production.
+
+AVAILABLE K8S MANIFESTS IN REPO (/k8s/):
+1. k8s/argocd-application.yaml: ArgoCD Application syncing from https://github.com/toysavi/csx-analyst-ai.git path 'k8s'
+2. k8s/namespace.yaml: Creates namespace 'csx-analyst'
+3. k8s/deployment.yaml: Deploy 1 replica with liveness/readiness probes at /api/csx/market-overview
+4. k8s/service.yaml: ClusterIP service exposing port 80 -> 3000
+5. k8s/certificate.yaml: Cert-manager Certificate for csx.toysavi.com using letsencrypt-prod
+6. k8s/traefik-ingressroute.yaml: Traefik IngressRoute CRD matching Host(\`csx.toysavi.com\`) with TLS
+7. k8s/ingress.yaml: Standard Kubernetes Ingress alternative with cert-manager annotations
+8. k8s/secret.yaml.example & k8s/kustomization.yaml
+
+YOUR GOALS:
+- Give exact, executable, production-ready bash/kubectl/argocd commands.
+- Explain clearly how ArgoCD detects Git commits from https://github.com/toysavi/csx-analyst-ai.git and automatically reconciles.
+- Help troubleshoot common pitfalls:
+  * DNS A-record for csx.toysavi.com pointing to Traefik LoadBalancer / NodePort external IP.
+  * Cert-Manager HTTP-01 or DNS-01 ACME challenges ("kubectl describe challenge -n csx-analyst", "kubectl describe certificaterequest").
+  * Creating the GEMINI_API_KEY secret ("kubectl create secret generic csx-analyst-secrets -n csx-analyst --from-literal=GEMINI_API_KEY=YOUR_KEY").
+  * Image pull errors if ghcr.io is private (create imagePullSecret) or public (no credentials required).
+- Format code blocks clearly using markdown.
+`;
+    } else {
+      const allStocks = await csxDataProvider.getAllStocks();
+      const overview = await csxDataProvider.getMarketOverview();
+      const news = await csxDataProvider.getNews();
+
+      // Context preparation
+      const stockSummaries = allStocks.map(s => 
+        `${s.ticker} (${s.name}): Price ${s.currentPrice.toLocaleString()} KHR (${s.change >= 0 ? '+' : ''}${s.changePercent}%), AI Score ${s.aiScore.overallScore}/100 [${s.aiScore.signal}], Risk ${s.risk.level}, 7D Target: ${s.forecast7Day.targetPrice7Day.toLocaleString()} KHR (${s.forecast7Day.confidenceScore}% conf, Range ${s.forecast7Day.dailyBreakdown[7]?.lowerRange.toLocaleString()}-${s.forecast7Day.dailyBreakdown[7]?.upperRange.toLocaleString()} KHR), P/E: ${s.peRatio || 'N/A'}, Div Yield: ${s.dividendYieldPercent || 'N/A'}%`
+      ).join('\n');
+
+      let specificStockContext = '';
+      if (selectedStockTicker) {
+        const currentStock = allStocks.find(s => s.ticker.toUpperCase() === selectedStockTicker.toUpperCase());
+        if (currentStock) {
+          specificStockContext = `
 CURRENTLY SELECTED STOCK DEEP DIVE:
 Ticker: ${currentStock.ticker} - ${currentStock.name} (${currentStock.khmerName})
 Market Board: ${currentStock.board} | Sector: ${currentStock.sector} | ISIN: ${currentStock.isin}
@@ -241,14 +284,14 @@ Historical Forecast Accuracy: MAPE ${currentStock.accuracy.meanAbsolutePercentag
 Risk Factors: Level ${currentStock.risk.level} (${currentStock.risk.overallScore}/100). Primary risks: ${currentStock.risk.primaryRisks.join('; ')}.
 Highlights: ${currentStock.businessHighlights.join('; ')}
 `;
+        }
       }
-    }
 
-    const newsContext = news.slice(0, 5).map(n =>
-      `- [${n.date}] ${n.ticker || 'CSX'}: "${n.headline}" (Impact: ${n.aiImpact.newsImpact}, Confidence: ${n.aiImpact.impactConfidence}, Market Priced In: ${n.aiImpact.marketPricedIn})`
-    ).join('\n');
+      const newsContext = news.slice(0, 5).map(n =>
+        `- [${n.date}] ${n.ticker || 'CSX'}: "${n.headline}" (Impact: ${n.aiImpact.newsImpact}, Confidence: ${n.aiImpact.impactConfidence}, Market Priced In: ${n.aiImpact.marketPricedIn})`
+      ).join('\n');
 
-    const systemInstruction = `
+      systemInstruction = `
 You are the institutional AI Analyst for "CSX AI Analyst", a specialized quantitative research terminal for the Cambodia Securities Exchange (CSX).
 
 CRITICAL COMPLIANCE & ACCURACY GUIDELINES:
@@ -272,6 +315,7 @@ ${specificStockContext}
 RECENT DISCLOSURES & MARKET NEWS:
 ${newsContext}
 `;
+    }
 
     // Construct contents
     const contents: any[] = [];

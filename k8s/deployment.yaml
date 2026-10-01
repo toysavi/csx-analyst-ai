@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: csx-analyst-ai
+  namespace: csx-analyst
+  labels:
+    app: csx-analyst-ai
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: csx-analyst-ai
+  template:
+    metadata:
+      labels:
+        app: csx-analyst-ai
+    spec:
+      containers:
+        - name: app
+          image: ghcr.io/toysavi/csx-analyst-ai:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+              name: http
+          env:
+            - name: PORT
+              value: "3000"
+            - name: NODE_ENV
+              value: "production"
+            - name: GEMINI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: csx-analyst-secrets
+                  key: GEMINI_API_KEY
+          livenessProbe:
+            httpGet:
+              path: /api/csx/market-overview
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /api/csx/market-overview
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi

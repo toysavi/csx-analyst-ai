@@ -68,6 +68,55 @@ Now you and anyone else can pull `docker pull ghcr.io/toysavi/csx-analyst-ai:lat
 
 ---
 
+## ☸️ ArgoCD GitOps Deployment (Traefik & Cert-Manager for csx.toysavi.com)
+
+The repository includes production Kubernetes & ArgoCD manifests under `/k8s/`:
+* `k8s/argocd-application.yaml`: ArgoCD Application referencing `https://github.com/toysavi/csx-analyst-ai.git`
+* `k8s/deployment.yaml`: Deployment with `ghcr.io/toysavi/csx-analyst-ai:latest`, probes & resources
+* `k8s/service.yaml`: ClusterIP service (port 80 -> 3000)
+* `k8s/traefik-ingressroute.yaml`: Traefik CRD IngressRoute for `csx.toysavi.com` with TLS
+* `k8s/ingress.yaml`: Standard Kubernetes Ingress alternative with cert-manager annotations
+* `k8s/certificate.yaml`: Cert-Manager Certificate for `csx.toysavi.com` (using `letsencrypt-prod`)
+* `k8s/kustomization.yaml`: Kustomize bundle
+
+### Step 1: Create the Kubernetes Secret for Gemini AI
+```bash
+kubectl create namespace csx-analyst --dry-run=client -o yaml | kubectl apply -f -
+
+kubectl create secret generic csx-analyst-secrets \
+  --namespace csx-analyst \
+  --from-literal=GEMINI_API_KEY="YOUR_ACTUAL_GEMINI_API_KEY"
+```
+
+### Step 2: Apply the ArgoCD Application
+```bash
+kubectl apply -f k8s/argocd-application.yaml
+```
+ArgoCD will automatically clone `https://github.com/toysavi/csx-analyst-ai.git`, apply all manifests in the `k8s/` folder, and reconcile on every commit.
+
+### Step 3: Configure DNS for csx.toysavi.com
+Point the DNS **A record** for `csx.toysavi.com` to your Traefik Ingress LoadBalancer external IP:
+```bash
+# Find Traefik LoadBalancer External IP
+kubectl get svc -n traefik
+```
+
+### Step 4: Verify Cert-Manager Automated SSL & Traefik Ingress
+```bash
+# Check TLS certificate issuance
+kubectl get certificate -n csx-analyst
+kubectl describe certificate csx-toysavi-tls -n csx-analyst
+
+# Check Traefik IngressRoute
+kubectl get ingressroute -n csx-analyst
+
+# Check running application pods
+kubectl get pods -n csx-analyst
+```
+Once cert-manager finishes the HTTP-01 challenge, your application will be securely accessible at **`https://csx.toysavi.com`** with an official Let's Encrypt SSL certificate!
+
+---
+
 ## 🚀 How the Automated Pipeline Works
 
 1. **You push code to GitHub:**

@@ -1,0 +1,31 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: csx-analyst-traefik-tls
+  namespace: csx-analyst
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`csx.toysavi.com`)
+      kind: Rule
+      services:
+        - name: csx-analyst-ai
+          port: 80
+  tls:
+    secretName: csx-toysavi-tls
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: csx-analyst-traefik-http
+  namespace: csx-analyst
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: Host(`csx.toysavi.com`)
+      kind: Rule
+      services:
+        - name: csx-analyst-ai
+          port: 80

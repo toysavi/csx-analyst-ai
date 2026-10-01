@@ -100,6 +100,19 @@ docker run -d \\
 # Or start with Docker Compose:
 # docker compose up -d`;
 
+  const argoCdSnippet = `# 1. Create namespace & Gemini AI Secret
+kubectl create namespace csx-analyst --dry-run=client -o yaml | kubectl apply -f -
+
+kubectl create secret generic csx-analyst-secrets \\
+  --namespace csx-analyst \\
+  --from-literal=GEMINI_API_KEY="YOUR_GEMINI_API_KEY"
+
+# 2. Apply ArgoCD Application for https://github.com/toysavi/csx-analyst-ai.git
+kubectl apply -f k8s/argocd-application.yaml
+
+# 3. Verify Traefik IngressRoute & Cert-Manager SSL for csx.toysavi.com
+kubectl get ingressroute,certificate,pods -n csx-analyst`;
+
   return (
     <div className="space-y-6">
       {/* Top Banner: Quick Access to Live CSX Sync */}
@@ -228,6 +241,20 @@ docker run -d \\
           </div>
           <pre className="p-3 bg-slate-950 rounded-xl border border-slate-800 font-mono text-[11px] text-emerald-300 overflow-x-auto">
             {dockerPullRun}
+          </pre>
+
+          <div className="flex items-center justify-between text-xs pt-2">
+            <span className="font-bold text-slate-300 font-mono">ArgoCD & Traefik Deployment (csx.toysavi.com):</span>
+            <button
+              onClick={() => copyToClipboard(argoCdSnippet, 'argocd')}
+              className="text-slate-400 hover:text-white flex items-center gap-1 cursor-pointer font-mono text-[11px]"
+            >
+              {copiedSection === 'argocd' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+              {copiedSection === 'argocd' ? 'Copied!' : 'Copy'}
+            </button>
+          </div>
+          <pre className="p-3 bg-slate-950 rounded-xl border border-slate-800 font-mono text-[11px] text-purple-300 overflow-x-auto">
+            {argoCdSnippet}
           </pre>
 
           <div className="flex items-center justify-between text-xs pt-2">
