@@ -1,5 +1,6 @@
 import express, { Request, Response } from 'express';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
@@ -364,9 +365,17 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    app.use(express.static(path.resolve(__dirname, 'dist')));
+    // Safely resolve the client dist directory:
+    // When executing dist/server.js, __dirname is already inside /app/dist.
+    // When executing from root, client files are in /app/dist.
+    const clientDistPath = fs.existsSync(path.resolve(__dirname, 'index.html'))
+      ? __dirname
+      : path.resolve(process.cwd(), 'dist');
+
+    console.log(`[CSX AI Analyst] Serving production client from: ${clientDistPath}`);
+    app.use(express.static(clientDistPath));
     app.get('*', (_req, res) => {
-      res.sendFile(path.resolve(__dirname, 'dist', 'index.html'));
+      res.sendFile(path.resolve(clientDistPath, 'index.html'));
     });
   }
 
