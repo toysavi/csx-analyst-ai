@@ -122,10 +122,39 @@ app.get('/api/csx/provider-status', async (_req: Request, res: Response) => {
   }
 });
 
-// 6.2 Live Market Sync
+// 6.2 Live Market Sync & Ingestion (supports customUpdates, JSON array, or raw text)
 app.post('/api/csx/sync-live', async (req: Request, res: Response) => {
   try {
-    const { customUpdates } = req.body || {};
+    let customUpdates = req.body?.customUpdates;
+
+    // Direct JSON array payload: [{ ticker: "PWSA", price: 7240 }]
+    if (Array.isArray(req.body)) {
+      customUpdates = req.body;
+    }
+
+    // Direct raw text ingestion (e.g. pasted tables from csx.com.kh or broker reports)
+    if (req.body?.rawText && typeof req.body.rawText === 'string') {
+      const parsed: Array<{ ticker: string; price: number; volume?: number }> = [];
+      const lines = req.body.rawText.split('\n');
+      const validTickers = ['PWSA', 'GTI', 'PPAP', 'PPSP', 'PAS', 'ABC', 'DBDE', 'JSL', 'CGSM', 'MJQE'];
+      for (const line of lines) {
+        const tokens = line.trim().replace(/,/g, '').split(/[\s,;\t|]+/);
+        for (let i = 0; i < tokens.length; i++) {
+          const upper = tokens[i].toUpperCase();
+          if (validTickers.includes(upper) && tokens[i + 1]) {
+            const price = parseFloat(tokens[i + 1]);
+            const volume = tokens[i + 2] ? parseFloat(tokens[i + 2]) : undefined;
+            if (!isNaN(price) && price > 0) {
+              parsed.push({ ticker: upper, price, volume: !isNaN(volume!) ? volume : undefined });
+            }
+          }
+        }
+      }
+      if (parsed.length > 0) {
+        customUpdates = parsed;
+      }
+    }
+
     const result = await csxDataProvider.syncLiveMarket(customUpdates);
     res.json({
       success: true,

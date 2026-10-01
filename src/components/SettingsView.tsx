@@ -311,6 +311,28 @@ kubectl get ingressroute,certificate,pods -n csx-analyst`;
               <li>Instantly witness the system recalculate SMA 5/20/50, RSI(14), MACD, Bollinger Bands, and recalibrate the 7-day AI forecast cone in real time!</li>
             </ul>
           </div>
+
+          <div className="p-3.5 bg-slate-850 rounded-xl border border-slate-800 space-y-2">
+            <div className="font-bold text-white text-sm flex items-center gap-2">
+              <Terminal className="w-4 h-4 text-emerald-400" />
+              4. Automated Real-Time Sync via REST API & Python Cron
+            </div>
+            <p className="text-slate-400">
+              You can stream real-time price updates from any broker script, Google Sheet, or scraping worker by sending a POST request to <code className="text-emerald-300">/api/csx/sync-live</code>:
+            </p>
+            <pre className="p-3 bg-slate-950 rounded-lg text-[11px] font-mono text-emerald-300 overflow-x-auto border border-slate-800">
+{`# Example: Pushing live market quotes from broker/scraper to this terminal
+curl -X POST https://csx.toysavi.com/api/csx/sync-live \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "customUpdates": [
+      {"ticker": "PWSA", "price": 7240, "change": 20, "volume": 15400},
+      {"ticker": "ABC", "price": 9480, "change": -40, "volume": 89000},
+      {"ticker": "PAS", "price": 12800, "change": 200, "volume": 23000}
+    ]
+  }'`}
+            </pre>
+          </div>
         </div>
       </div>
 
