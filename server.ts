@@ -110,6 +110,53 @@ app.get('/api/csx/alerts', async (_req: Request, res: Response) => {
   }
 });
 
+// 6.1 Provider Live Status & CSX Connection Info
+app.get('/api/csx/provider-status', async (_req: Request, res: Response) => {
+  try {
+    const status = csxDataProvider.getProviderStatus();
+    res.json(status);
+  } catch (error) {
+    console.error('Error fetching provider status:', error);
+    res.status(500).json({ error: 'Failed to fetch provider status' });
+  }
+});
+
+// 6.2 Live Market Sync
+app.post('/api/csx/sync-live', async (req: Request, res: Response) => {
+  try {
+    const { customUpdates } = req.body || {};
+    const result = await csxDataProvider.syncLiveMarket(customUpdates);
+    res.json({
+      success: true,
+      message: `Successfully synchronized ${result.updatedCount} CSX securities`,
+      ...result,
+    });
+  } catch (error: any) {
+    console.error('Error syncing live market:', error);
+    res.status(500).json({ error: 'Failed to sync live market', details: error?.message });
+  }
+});
+
+// 6.3 Update Single Stock Price (Live Real-Time Override)
+app.post('/api/csx/update-stock', async (req: Request, res: Response) => {
+  try {
+    const { ticker, price, change, volume } = req.body;
+    if (!ticker || price === undefined) {
+      return res.status(400).json({ error: 'Ticker and price are required' });
+    }
+    const updatedStock = await csxDataProvider.updateStockPrice(ticker, Number(price), change, volume);
+    const indexData = await csxDataProvider.getMarketOverview();
+    res.json({
+      success: true,
+      stock: updatedStock,
+      indexData,
+    });
+  } catch (error: any) {
+    console.error('Error updating stock price:', error);
+    res.status(500).json({ error: 'Failed to update stock price', details: error?.message });
+  }
+});
+
 // 7. Backtest Run
 app.post('/api/csx/backtest', async (req: Request, res: Response) => {
   try {

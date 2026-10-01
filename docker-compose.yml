@@ -1,0 +1,15 @@
+# Docker Compose configuration for CSX AI Analyst
+# Image pulled automatically from GitHub Container Registry (GHCR)
+
+services:
+  csx-analyst:
+    image: ghcr.io/toysavi/csx-analyst-ai:latest
+    container_name: csx-analyst-ai
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      # Pass your Gemini API Key here or in a .env file
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - PORT=3000
+      - NODE_ENV=production

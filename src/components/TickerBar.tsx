@@ -8,6 +8,7 @@ interface TickerBarProps {
   onCurrencyToggle: () => void;
   language: 'EN' | 'KH';
   onLanguageToggle: () => void;
+  onOpenLiveSync?: () => void;
 }
 
 export const TickerBar: React.FC<TickerBarProps> = ({
@@ -16,6 +17,7 @@ export const TickerBar: React.FC<TickerBarProps> = ({
   onCurrencyToggle,
   language,
   onLanguageToggle,
+  onOpenLiveSync,
 }) => {
   const isPositive = indexData.change >= 0;
 
@@ -44,13 +46,17 @@ export const TickerBar: React.FC<TickerBarProps> = ({
           </span>
         </div>
 
-        <div className="hidden lg:flex items-center gap-1.5 text-[11px] text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700/50 font-mono">
+        <button
+          onClick={onOpenLiveSync}
+          className="hidden lg:flex items-center gap-1.5 text-[11px] text-slate-400 bg-slate-800/80 hover:bg-slate-750 px-2 py-0.5 rounded border border-slate-700/50 font-mono transition cursor-pointer"
+          title="Click to check CSX feed connection or synchronize live prices"
+        >
           <Clock className="w-3 h-3 text-blue-400" />
           <span>CSX Feed: <strong className="text-slate-200">csx.com.kh</strong></span>
           <span className="text-slate-500">•</span>
           <span className="text-emerald-400 font-semibold">{indexData.tradingSession || 'Continuous Trading (09:00 - 14:50)'}</span>
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse ml-1" title="Official CSX Market Feed Connected"></span>
-        </div>
+        </button>
       </div>
 
       {/* Actual Data vs AI tag + Currency Switcher */}

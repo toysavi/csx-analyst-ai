@@ -1,0 +1,88 @@
+# CSX AI Analyst
+
+Institutional-grade quantitative research, forecasting, and news intelligence terminal for equities listed on the Cambodia Securities Exchange (CSX).
+
+* **GitHub Repository:** `toysavi/csx-analyst-ai`
+* **Docker Image Registry:** `ghcr.io/toysavi/csx-analyst-ai:latest`
+
+---
+
+## ⚡ Quick Start: Pull and Run with Docker
+
+Every time you push code to `toysavi/csx-analyst-ai`, GitHub Actions automatically builds and publishes the latest Docker container image.
+
+### Option A: Using Docker Run
+```bash
+docker pull ghcr.io/toysavi/csx-analyst-ai:latest
+
+docker run -d \
+  --name csx-analyst \
+  -p 3000:3000 \
+  -e GEMINI_API_KEY="YOUR_GEMINI_API_KEY" \
+  -e PORT=3000 \
+  ghcr.io/toysavi/csx-analyst-ai:latest
+```
+
+Open your browser at: **`http://localhost:3000`**
+
+### Option B: Using Docker Compose
+Create a `.env` file containing:
+```bash
+GEMINI_API_KEY=YOUR_GEMINI_API_KEY
+```
+Then start the application with:
+```bash
+docker compose up -d
+```
+
+To view logs:
+```bash
+docker compose logs -f
+```
+
+To stop:
+```bash
+docker compose down
+```
+
+---
+
+## ⚙️ One-Time Setup in GitHub (`toysavi/csx-analyst-ai`)
+
+For GitHub Actions to push images to GitHub Packages without any permissions errors:
+
+1. Open your repository in GitHub:
+   👉 **`https://github.com/toysavi/csx-analyst-ai/settings/actions`**
+2. Scroll down to **Workflow permissions**.
+3. Select **Read and write permissions**.
+4. Click **Save**.
+
+### Making the Docker Image Public (Recommended)
+By default, GitHub Packages are private. To allow pulling without entering a GitHub Personal Access Token:
+1. Go to your repository's packages: **`https://github.com/toysavi/csx-analyst-ai/packages`**
+2. Click on **`csx-analyst-ai`**.
+3. Click **Package settings** (on the right sidebar).
+4. Scroll to **Danger Zone** -> **Change visibility** -> Select **Public**.
+
+Now you and anyone else can pull `docker pull ghcr.io/toysavi/csx-analyst-ai:latest` without logging in!
+
+---
+
+## 🚀 How the Automated Pipeline Works
+
+1. **You push code to GitHub:**
+   ```bash
+   git add .
+   git commit -m "Update application"
+   git push origin main
+   ```
+2. **GitHub Actions automatically:**
+   * Runs the workflow defined in `.github/workflows/docker-build-push.yml`
+   * Compiles the Vite React frontend
+   * Packages the full-stack Node.js server with `@google/genai`
+   * Publishes the new image as `ghcr.io/toysavi/csx-analyst-ai:latest`
+3. **You pull and run the updated image:**
+   ```bash
+   docker pull ghcr.io/toysavi/csx-analyst-ai:latest
+   docker restart csx-analyst
+   ```

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, Sparkles, Bell, PlayCircle, BarChart3, HelpCircle } from 'lucide-react';
+import { Search, Sparkles, Bell, PlayCircle, BarChart3, HelpCircle, RefreshCw } from 'lucide-react';
 import { CSXStock } from '../types/csx';
 
 interface NavbarProps {
@@ -8,6 +8,7 @@ interface NavbarProps {
   onOpenAIChat: () => void;
   onOpenDailyPipeline: () => void;
   onOpenAlerts: () => void;
+  onOpenLiveSync: () => void;
   unreadAlertsCount: number;
   searchQuery: string;
   onSearchChange: (q: string) => void;
@@ -19,6 +20,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenAIChat,
   onOpenDailyPipeline,
   onOpenAlerts,
+  onOpenLiveSync,
   unreadAlertsCount,
   searchQuery,
   onSearchChange,
@@ -92,6 +94,16 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Action Controls */}
         <div className="flex items-center gap-2.5">
+          {/* Live Sync / CSX Market Button */}
+          <button
+            onClick={onOpenLiveSync}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-950/70 hover:bg-blue-900/80 text-blue-300 text-xs font-medium border border-blue-800/80 transition cursor-pointer shadow-sm"
+            title="Synchronize live CSX market data or override current stock prices"
+          >
+            <RefreshCw className="w-3.5 h-3.5 text-blue-400" />
+            <span className="hidden sm:inline">Sync CSX</span>
+          </button>
+
           {/* Daily Pipeline Button */}
           <button
             onClick={onOpenDailyPipeline}

@@ -20,6 +20,7 @@ import { ForecastTable } from './components/ForecastTable';
 import { AIChatModal } from './components/AIChatModal';
 import { DailyPipelineModal } from './components/DailyPipelineModal';
 import { AlertsModal } from './components/AlertsModal';
+import { LiveSyncModal } from './components/LiveSyncModal';
 
 export default function App() {
   const [stocks, setStocks] = useState<CSXStock[]>(() => buildCSXStocks());
@@ -41,6 +42,7 @@ export default function App() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isPipelineOpen, setIsPipelineOpen] = useState(false);
   const [isAlertsOpen, setIsAlertsOpen] = useState(false);
+  const [isLiveSyncOpen, setIsLiveSyncOpen] = useState(false);
 
   // Initial data loading from server API
   useEffect(() => {
@@ -113,6 +115,7 @@ export default function App() {
         onCurrencyToggle={() => setCurrency(prev => (prev === 'KHR' ? 'USD' : 'KHR'))}
         language={language}
         onLanguageToggle={() => setLanguage(prev => (prev === 'EN' ? 'KH' : 'EN'))}
+        onOpenLiveSync={() => setIsLiveSyncOpen(true)}
       />
 
       {/* Main App Navbar */}
@@ -122,6 +125,7 @@ export default function App() {
         onOpenAIChat={() => setIsChatOpen(true)}
         onOpenDailyPipeline={() => setIsPipelineOpen(true)}
         onOpenAlerts={() => setIsAlertsOpen(true)}
+        onOpenLiveSync={() => setIsLiveSyncOpen(true)}
         unreadAlertsCount={unreadAlertsCount}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
@@ -243,10 +247,23 @@ export default function App() {
               onCurrencyToggle={() => setCurrency(prev => (prev === 'KHR' ? 'USD' : 'KHR'))}
               language={language}
               onLanguageToggle={() => setLanguage(prev => (prev === 'EN' ? 'KH' : 'EN'))}
+              onOpenLiveSync={() => setIsLiveSyncOpen(true)}
             />
           ) : null}
         </main>
       </div>
+
+      {/* Live CSX Sync & Price Override Modal */}
+      <LiveSyncModal
+        isOpen={isLiveSyncOpen}
+        onClose={() => setIsLiveSyncOpen(false)}
+        stocks={stocks}
+        indexData={indexData}
+        onSyncComplete={(updatedStocks, newIndexData) => {
+          setStocks(updatedStocks);
+          setIndexData(newIndexData);
+        }}
+      />
 
       {/* AI Analyst Chat Modal */}
       <AIChatModal
