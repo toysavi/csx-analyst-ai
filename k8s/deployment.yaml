@@ -6,7 +6,7 @@ metadata:
   labels:
     app: csx-analyst-ai
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: csx-analyst-ai
